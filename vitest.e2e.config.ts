@@ -14,5 +14,12 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
     },
+    // Executar testes sequencialmente para evitar conflitos de banco
+    pool: 'forks',
+    poolOptions: {
+      forks: {
+        singleFork: true
+      }
+    }
   },
 });

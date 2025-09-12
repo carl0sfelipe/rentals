@@ -16,6 +16,6 @@ import { JwtModule } from '@nestjs/jwt';
     PBKDF2Hasher,
     { provide: 'PasswordHasher', useExisting: PBKDF2Hasher },
   ],
-  exports: [AuthService],
+  exports: [AuthService, JwtModule],
 })
 export class AuthModule {}

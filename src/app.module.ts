@@ -6,10 +6,11 @@ import { CalendarModule } from './calendar/calendar.module';
 import { AuthModule } from './auth/auth.module';
 import { HealthModule } from './health/health.module';
 import { PropertiesModule } from './properties/properties.module';
+import { BookingsModule } from './bookings/bookings.module';
 import { PrismaModule } from './prisma/prisma.module';
 
 @Module({
-  imports: [ScheduleModule.forRoot(), CalendarModule, AuthModule, HealthModule, PropertiesModule, PrismaModule],
+  imports: [ScheduleModule.forRoot(), PrismaModule, CalendarModule, AuthModule, HealthModule, PropertiesModule, BookingsModule],
   controllers: [AppController],
   providers: [AppService],
 })

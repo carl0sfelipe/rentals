@@ -35,10 +35,16 @@ describe('Simple Auth E2E', () => {
     
     await app.init();
     prisma = moduleFixture.get<PrismaService>(PrismaService);
+    
+    // Limpar banco antes de começar
+    await (prisma as any).booking.deleteMany({});
+    await (prisma as any).property.deleteMany({});
+    await prisma.user.deleteMany({});
   });
 
   afterAll(async () => {
-    // Limpar dados de teste na ordem correta
+    // Limpar dados de teste na ordem correta - bookings primeiro, depois properties, depois users
+    await (prisma as any).booking.deleteMany({});
     await (prisma as any).property.deleteMany({});
     await prisma.user.deleteMany({});
     await app.close();
