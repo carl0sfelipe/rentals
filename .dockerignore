@@ -1,0 +1,45 @@
+# .dockerignore
+# Objetivo: Evitar copiar arquivos desnecessários para o contexto de build,
+# reduzindo tamanho de layers e melhorando performance de cache.
+
+# Dependências instaladas dentro do container
+node_modules
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs
+*.log
+
+# Builds / artefatos
+/dist
+/.next
+/build
+coverage
+
+# Config e env locais
+.env
+.env.*
+!.env.example
+
+# Sistema / editor
+.git
+.gitignore
+Dockerfile*
+.dockerignore
+.vscode
+.idea
+*.swp
+*.swo
+
+# Mac / Linux / Windows
+.DS_Store
+Thumbs.db
+
+# Testes temporários
+.tmp
+.cache
+
+# Outras ferramentas
+pnpm-store
