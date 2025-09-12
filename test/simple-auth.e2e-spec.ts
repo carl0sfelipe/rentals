@@ -1,21 +1,25 @@
 import 'reflect-metadata';
+import { config } from 'dotenv';
 import { beforeAll, afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
+import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 
-describe('Auth E2E', () => {
+// Carregar variáveis de ambiente de teste
+config({ path: '.env.test' });
+
+describe('Simple Auth E2E', () => {
   let app: INestApplication;
   let prisma: PrismaService;
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({
+    const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
 
-    app = moduleRef.createNestApplication();
+    app = moduleFixture.createNestApplication();
     app.useGlobalPipes(new ValidationPipe({
       whitelist: true,
       forbidNonWhitelisted: true,
@@ -28,9 +32,9 @@ describe('Auth E2E', () => {
         target: false,
       },
     }));
+    
     await app.init();
-
-    prisma = moduleRef.get(PrismaService);
+    prisma = moduleFixture.get<PrismaService>(PrismaService);
   });
 
   afterAll(async () => {
@@ -44,32 +48,51 @@ describe('Auth E2E', () => {
 
   it('POST /auth/register deve criar usuário (201)', async () => {
     const timestamp = Date.now();
-    const email = `e2e-${timestamp}@test.com`;
+    const email = `simple-${timestamp}@test.com`;
+    
     const res = await request(app.getHttpServer())
       .post('/auth/register')
-      .send({ email, password: 'password123', name: 'E2E User' })
+      .send({ email, password: 'password123', name: 'Simple User' })
       .expect(201);
-    expect(res.body).toMatchObject({ email, name: 'E2E User' });
+    
+    expect(res.body).toMatchObject({ email, name: 'Simple User' });
+    expect(res.body.id).toBeDefined();
   });
 
   it('POST /auth/login deve retornar token (200)', async () => {
     const timestamp = Date.now();
     const email = `login-${timestamp}@test.com`;
+    
+    // Primeiro registrar um usuário
     await request(app.getHttpServer())
       .post('/auth/register')
       .send({ email, password: 'password123', name: 'Login User' })
       .expect(201);
+
+    // Então fazer login
     const res = await request(app.getHttpServer())
       .post('/auth/login')
       .send({ email, password: 'password123' })
       .expect(200);
-    expect(res.body).toEqual({ access_token: expect.any(String) });
+    
+    expect(res.body.access_token).toBeDefined();
+    expect(typeof res.body.access_token).toBe('string');
   });
 
-  it('POST /auth/register - should fail if password is too short', async () => {
+  it('POST /auth/register deve falhar com email inválido (400)', async () => {
     await request(app.getHttpServer())
       .post('/auth/register')
-      .send({ email: 'short@example.com', password: 'short', name: 'Short User' })
+      .send({ email: 'invalid-email', password: 'password123', name: 'Invalid Email' })
+      .expect(400);
+  });
+
+  it('POST /auth/register deve falhar com senha curta (400)', async () => {
+    const timestamp = Date.now();
+    const email = `short-${timestamp}@example.com`;
+    
+    await request(app.getHttpServer())
+      .post('/auth/register')
+      .send({ email, password: 'short', name: 'Short Pass' })
       .expect(400);
   });
 });

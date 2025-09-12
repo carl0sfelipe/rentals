@@ -1,7 +1,9 @@
 import { ConflictException, Injectable, UnauthorizedException, Inject } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import { PrismaService } from '../prisma/prisma.service';
 import * as crypto from 'crypto';
 
-export class RegisterDto { email!: string; password!: string; }
+export class RegisterDto { email!: string; password!: string; name!: string; }
 export class LoginDto { email!: string; password!: string; }
 
 // Strategy interface
@@ -29,8 +31,8 @@ export class PBKDF2Hasher implements PasswordHasher {
 @Injectable()
 export class AuthService {
   constructor(
-    @Inject('PrismaService') private readonly prisma: any,
-    @Inject('JwtService') private readonly jwt: any,
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(JwtService) private readonly jwt: JwtService,
     @Inject('PasswordHasher') private readonly hasher: PasswordHasher,
   ) {}
 
@@ -42,8 +44,8 @@ export class AuthService {
     try {
       // Retorna apenas campos seguros
       return await this.prisma.user.create({
-        data: { email: dto.email, password: hashed },
-        select: { id: true, email: true },
+        data: { email: dto.email, password: hashed, name: dto.name },
+        select: { id: true, email: true, name: true },
       });
     } catch (err: any) {
       // Prisma unique constraint (race condition)
