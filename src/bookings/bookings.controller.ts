@@ -11,7 +11,7 @@ export class BookingsController {
   }
 
   @Post()
-  async create(@Request() req, @Param('propertyId') propertyId: string, @Body() dto: CreateBookingDto) {
+  async create(@Request() req: any, @Param('propertyId') propertyId: string, @Body() dto: CreateBookingDto) {
     return this.bookingsService.create(dto, req.user.id, propertyId);
   }
 }

@@ -1,7 +1,7 @@
 # docker-compose.yml
-# Stack de desenvolvimento para aplicação NestJS + PostgreSQL.
+# Stack completo de desenvolvimento: React Frontend + NestJS API + PostgreSQL
 # Execução: docker compose up --build
-# A aplicação é montada como volume para hot-reload usando "npm run start:dev".
+# Frontend: http://localhost:5173 | API: http://localhost:3000 | DB: localhost:5433
 
 services:
   api:
@@ -50,6 +50,30 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  frontend:
+    container_name: rentals_frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    volumes:
+      # Monta o código local para hot reload
+      - ./frontend:/usr/src/app
+      # Evita sobrescrever node_modules
+      - /usr/src/app/node_modules
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:3000
+    depends_on:
+      - api
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:5173 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
   test:
     container_name: rentals_api_test
     build:
@@ -73,5 +97,8 @@ volumes:
 
 # Observações:
 # - Copie .env.example para .env antes de subir.
-# - Se quiser usar porta 5432 no host, pare o serviço local ou defina DB_HOST_PORT=5432 no .env e garanta que esteja livre.
+# - Frontend disponível em: http://localhost:5173
+# - API disponível em: http://localhost:3000  
+# - Banco de dados: localhost:5433 (ou defina DB_HOST_PORT no .env)
 # - Executar migrações: docker compose exec api <comando>
+# - Executar testes: docker compose run --rm test npm run test:e2e
