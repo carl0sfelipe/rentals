@@ -36,7 +36,7 @@ interface AvailabilityUpsertArgs {
 
 interface PrismaLike {
   availability: { upsert(args: AvailabilityUpsertArgs): Promise<any>; };
-  property?: { findMany(args: any): Promise<Array<{ id: string; calendarUrl: string }>> };
+  property?: { findMany(args: any): Promise<Array<{ id: string }>> };
 }
 
 @Injectable()
@@ -86,19 +86,8 @@ export class CalendarSyncService {
 
   @Cron(CronExpression.EVERY_30_MINUTES)
   async scheduledSync() {
-    if (!this.prisma?.property?.findMany) return; // ainda não implementado no mock
-    try {
-      this.logger.log('Iniciando sync periódico de calendários');
-      const props = await this.prisma.property.findMany({
-        where: { calendarUrl: { not: null } },
-        select: { id: true, calendarUrl: true },
-      });
-      for (const p of props) {
-        await this.syncForProperty({ propertyId: p.id, url: p.calendarUrl });
-      }
-      this.logger.log(`Sync concluído para ${props.length} propriedades`);
-    } catch (e: any) {
-      this.logger.error('Erro no sync periódico', e?.message);
-    }
+    // TODO: Implementar sync automático quando calendarUrl for adicionado ao schema
+    this.logger.log('Auto-sync não disponível - campo calendarUrl não existe no schema');
+    return;
   }
 }

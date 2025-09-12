@@ -15,83 +15,699 @@ const useAuth = () => {
 };
 
 // ============================================================================
-// DADOS MOCKADOS
+// UTILITÁRIOS E CONFIGURAÇÕES
 // ============================================================================
-const mockProperties = [
-  {
-    id: '1',
-    title: 'Casa de Praia em Copacabana',
-    description: 'Linda casa com vista para o mar, 3 quartos e 2 banheiros',
-    address: 'Rua Atlântica, 1500 - Copacabana, Rio de Janeiro',
-    pricePerNight: 350.00,
-    bedrooms: 3,
-    bathrooms: 2,
-    imageUrl: 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=400&h=300&fit=crop'
-  },
-  {
-    id: '2',
-    title: 'Apartamento Moderno em Ipanema',
-    description: 'Apartamento renovado no coração de Ipanema, ideal para casais',
-    address: 'Rua Visconde de Pirajá, 800 - Ipanema, Rio de Janeiro',
-    pricePerNight: 280.00,
-    bedrooms: 2,
-    bathrooms: 1,
-    imageUrl: 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=400&h=300&fit=crop'
-  },
-  {
-    id: '3',
-    title: 'Cobertura com Piscina na Barra',
-    description: 'Cobertura luxuosa com piscina privativa e vista panorâmica',
-    address: 'Av. das Américas, 3000 - Barra da Tijuca, Rio de Janeiro',
-    pricePerNight: 500.00,
-    bedrooms: 4,
-    bathrooms: 3,
-    imageUrl: 'https://images.unsplash.com/photo-1613490493576-7fde63acd811?w=400&h=300&fit=crop'
-  }
-];
+const API_BASE_URL = 'http://localhost:3000';
 
 // ============================================================================
-// FUNÇÕES DE API (SIMULADAS)
+// FUNÇÕES DE API (CONECTADAS AO BACKEND REAL)
 // ============================================================================
+
+// Função para fazer requisições HTTP com interceptor de auth
+const fetchWithAuth = async (url, options = {}) => {
+  const token = localStorage.getItem('authToken');
+  
+  // Adiciona Authorization header se token existir
+  const headers = {
+    'Content-Type': 'application/json',
+    ...options.headers,
+  };
+  
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      headers,
+    });
+
+    // Se token expirou (401), limpa localStorage e redireciona para login
+    if (response.status === 401 && token) {
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('authUser');
+      window.location.reload(); // Força reload para voltar ao login
+      throw new Error('Sessão expirada. Faça login novamente.');
+    }
+
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// Função para verificar se o token está válido/não expirado
+const isTokenValid = (token) => {
+  if (!token) return false;
+  
+  try {
+    // Decodifica o JWT payload (parte do meio)
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    const currentTime = Math.floor(Date.now() / 1000);
+    
+    // Verifica se não expirou
+    return payload.exp > currentTime;
+  } catch (error) {
+    return false;
+  }
+};
+
 const apiService = {
-  // Simula login na API
+  // Conecta ao backend real para login
   login: async (email, password) => {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        if (email && password.length >= 6) {
-          resolve({
-            access_token: 'fake-jwt-token-' + Date.now(),
-            user: { email }
-          });
-        } else {
-          reject(new Error('Credenciais inválidas'));
+    try {
+      const response = await fetch('http://localhost:3000/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email,
+          password,
+        }),
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('Email ou senha incorretos');
         }
-      }, 1000); // Simula delay de rede
-    });
+        throw new Error('Erro no servidor. Tente novamente.');
+      }
+
+      const data = await response.json();
+      
+      return {
+        access_token: data.access_token,
+        user: { email }
+      };
+    } catch (error) {
+      // Se for erro de rede (servidor não responde)
+      if (error.name === 'TypeError' && error.message.includes('fetch')) {
+        throw new Error('Erro de conexão. Verifique se o servidor está rodando.');
+      }
+      // Re-throw outros erros
+      throw error;
+    }
   },
 
-  // Simula buscar propriedades do usuário
+  // Busca propriedades do usuário autenticado
   getProperties: async (token) => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve(mockProperties);
-      }, 500);
-    });
+    try {
+      const response = await fetchWithAuth('http://localhost:3000/properties');
+      
+      if (!response.ok) {
+        throw new Error('Erro ao carregar propriedades');
+      }
+      
+      const properties = await response.json();
+      return properties;
+    } catch (error) {
+      console.error('Erro ao buscar propriedades:', error);
+      return [];
+    }
   },
 
-  // Simula criar um bloqueio
+  // Cria um bloqueio/reserva na API
   createBooking: async (propertyId, bookingData, token) => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({
-          id: Date.now().toString(),
-          propertyId,
-          ...bookingData,
-          status: 'confirmed'
-        });
-      }, 800);
-    });
+    try {
+      const response = await fetchWithAuth(`http://localhost:3000/properties/${propertyId}/bookings`, {
+        method: 'POST',
+        body: JSON.stringify({
+          startDate: bookingData.startDate,
+          endDate: bookingData.endDate,
+          type: bookingData.type,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        if (response.status === 400 && errorData.message.includes('Conflito de datas')) {
+          throw new Error(`CONFLICT: ${errorData.message}`);
+        }
+        throw new Error('Erro ao criar bloqueio');
+      }
+
+      const booking = await response.json();
+      return booking;
+    } catch (error) {
+      console.error('Erro ao criar booking:', error);
+      throw error;
+    }
+  },
+
+  // Busca bookings de uma propriedade
+  getBookings: async (propertyId) => {
+    try {
+      const response = await fetchWithAuth(`http://localhost:3000/properties/${propertyId}/bookings`);
+      
+      if (!response.ok) {
+        throw new Error('Erro ao carregar bookings');
+      }
+      
+      const bookings = await response.json();
+      return bookings;
+    } catch (error) {
+      console.error('Erro ao buscar bookings:', error);
+      return [];
+    }
+  },
+
+  // Atualiza um booking
+  updateBooking: async (propertyId, bookingId, bookingData) => {
+    try {
+      const response = await fetchWithAuth(`http://localhost:3000/properties/${propertyId}/bookings/${bookingId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          startDate: bookingData.startDate,
+          endDate: bookingData.endDate,
+          type: bookingData.type,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        if (response.status === 400 && errorData.message.includes('Conflito de datas')) {
+          throw new Error(`CONFLICT: ${errorData.message}`);
+        }
+        throw new Error('Erro ao atualizar booking');
+      }
+
+      const booking = await response.json();
+      return booking;
+    } catch (error) {
+      console.error('Erro ao atualizar booking:', error);
+      throw error;
+    }
+  },
+
+  // Deleta um booking
+  deleteBooking: async (propertyId, bookingId) => {
+    try {
+      const response = await fetchWithAuth(`http://localhost:3000/properties/${propertyId}/bookings/${bookingId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Erro ao deletar booking');
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Erro ao deletar booking:', error);
+      throw error;
+    }
+  },
+
+  // Cria uma nova propriedade
+  createProperty: async (propertyData) => {
+    try {
+      const response = await fetchWithAuth('http://localhost:3000/properties', {
+        method: 'POST',
+        body: JSON.stringify(propertyData),
+      });
+
+      if (!response.ok) {
+        throw new Error('Erro ao criar propriedade');
+      }
+
+      const property = await response.json();
+      return property;
+    } catch (error) {
+      console.error('Erro ao criar propriedade:', error);
+      throw error;
+    }
+  },
+
+  // Atualiza uma propriedade existente
+  updateProperty: async (propertyId, propertyData) => {
+    try {
+      const response = await fetchWithAuth(`http://localhost:3000/properties/${propertyId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(propertyData),
+      });
+
+      if (!response.ok) {
+        throw new Error('Erro ao atualizar propriedade');
+      }
+
+      const property = await response.json();
+      return property;
+    } catch (error) {
+      console.error('Erro ao atualizar propriedade:', error);
+      throw error;
+    }
+  },
+
+  // Deleta uma propriedade
+  deleteProperty: async (propertyId) => {
+    try {
+      const response = await fetchWithAuth(`http://localhost:3000/properties/${propertyId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Erro ao deletar propriedade');
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Erro ao deletar propriedade:', error);
+      throw error;
+    }
   }
+};
+
+// ============================================================================
+// COMPONENTE: LISTA DE BOOKINGS
+// ============================================================================
+const BookingsList = ({ propertyId }) => {
+  const [bookings, setBookings] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [editingBooking, setEditingBooking] = useState(null);
+  const [editError, setEditError] = useState('');
+  const [formData, setFormData] = useState({
+    startDate: '',
+    endDate: '',
+    type: 'BLOCKED'
+  });
+
+  // Carrega bookings ao montar
+  useEffect(() => {
+    const loadBookings = async () => {
+      try {
+        const bookingsData = await apiService.getBookings(propertyId);
+        setBookings(bookingsData);
+      } catch (err) {
+        console.error('Erro ao carregar bookings:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadBookings();
+  }, [propertyId]);
+
+  // Formata data para exibição
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString('pt-BR');
+  };
+
+  // Verifica se há conflito entre duas datas
+  const hasDateConflict = (booking1, booking2) => {
+    const start1 = new Date(booking1.startDate);
+    const end1 = new Date(booking1.endDate);
+    const start2 = new Date(booking2.startDate);
+    const end2 = new Date(booking2.endDate);
+
+    return (start1 < end2 && start2 < end1);
+  };
+
+  // Encontra conflitos para um booking específico
+  const getConflictingBookings = (currentBooking) => {
+    return bookings.filter(booking => 
+      booking.id !== currentBooking.id && hasDateConflict(currentBooking, booking)
+    );
+  };
+
+  // Handle editar booking
+  const handleEditBooking = (booking) => {
+    setEditingBooking(booking);
+    setEditError('');
+    setFormData({
+      startDate: booking.startDate.split('T')[0],
+      endDate: booking.endDate.split('T')[0],
+      type: booking.type
+    });
+  };
+
+  // Handle salvar edição
+  const handleSaveEdit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setEditError('');
+
+    try {
+      const updatedBooking = await apiService.updateBooking(propertyId, editingBooking.id, formData);
+      setBookings(bookings.map(b => b.id === editingBooking.id ? updatedBooking : b));
+      setEditingBooking(null);
+      alert('✅ Booking atualizado com sucesso!');
+    } catch (err) {
+      console.error('Erro ao atualizar booking:', err);
+      
+      if (err.message.startsWith('CONFLICT:')) {
+        const conflictMessage = err.message.replace('CONFLICT: ', '');
+        setEditError(conflictMessage);
+      } else {
+        setEditError('Erro ao atualizar booking. Tente novamente.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle deletar booking
+  const handleDeleteBooking = async (bookingId) => {
+    if (!confirm('Tem certeza que deseja excluir este bloqueio?')) {
+      return;
+    }
+
+    try {
+      await apiService.deleteBooking(propertyId, bookingId);
+      setBookings(bookings.filter(b => b.id !== bookingId));
+      alert('✅ Booking excluído com sucesso!');
+    } catch (err) {
+      console.error('Erro ao deletar booking:', err);
+      alert('❌ Erro ao excluir booking.');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="text-center py-8">
+        <LoadingSpinner />
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {bookings.length === 0 ? (
+        <div className="text-center py-8">
+          <div className="text-gray-500 mb-4">
+            <svg className="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2-2v16a2 2 0 002 2z" />
+            </svg>
+          </div>
+          <h4 className="text-lg font-medium text-gray-900 mb-2">Nenhum bloqueio encontrado</h4>
+          <p className="text-gray-600">Esta propriedade não possui bloqueios ou reservas.</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {bookings.map((booking) => {
+            const conflicts = getConflictingBookings(booking);
+            const hasConflicts = conflicts.length > 0;
+            
+            return (
+              <div key={booking.id} className={`border rounded-lg p-4 ${
+                hasConflicts ? 'border-red-300 bg-red-50' : 'border-gray-200'
+              }`}>
+                {/* Aviso de conflito */}
+                {hasConflicts && (
+                  <div className="mb-3 p-2 bg-red-100 border border-red-300 rounded-md">
+                    <div className="flex items-center">
+                      <svg className="w-4 h-4 text-red-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.664-.833-2.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                      </svg>
+                      <span className="text-sm text-red-800 font-medium">
+                        ⚠️ Conflito detectado com: {conflicts.map(c => `${formatDate(c.startDate)}-${formatDate(c.endDate)}`).join(', ')}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {editingBooking?.id === booking.id ? (
+                // Formulário de edição
+                <form onSubmit={handleSaveEdit} className="space-y-4">
+                  {/* Mensagem de erro de edição */}
+                  {editError && (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-md">
+                      <div className="flex items-start">
+                        <svg className="w-5 h-5 text-red-600 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.664-.833-2.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                        </svg>
+                        <div>
+                          <h5 className="text-sm font-medium text-red-800 mb-1">Conflito de Datas</h5>
+                          <p className="text-sm text-red-700">{editError}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Data Início
+                      </label>
+                      <input
+                        type="date"
+                        required
+                        value={formData.startDate}
+                        onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Data Fim
+                      </label>
+                      <input
+                        type="date"
+                        required
+                        value={formData.endDate}
+                        onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Tipo
+                      </label>
+                      <select
+                        value={formData.type}
+                        onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      >
+                        <option value="BLOCKED">Bloqueado</option>
+                        <option value="RESERVATION">Reserva</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="flex space-x-3">
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors disabled:opacity-50"
+                    >
+                      {loading ? 'Salvando...' : 'Salvar'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingBooking(null);
+                        setEditError('');
+                      }}
+                      className="bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400 transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                // Visualização normal
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center space-x-6">
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">
+                        {formatDate(booking.startDate)} - {formatDate(booking.endDate)}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        Criado em {formatDate(booking.createdAt)}
+                      </p>
+                    </div>
+                    <div>
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        booking.type === 'BLOCKED' 
+                          ? 'bg-red-100 text-red-800' 
+                          : 'bg-blue-100 text-blue-800'
+                      }`}>
+                        {booking.type === 'BLOCKED' ? 'Bloqueado' : 'Reserva'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => handleEditBooking(booking)}
+                      className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                    >
+                      Editar
+                    </button>
+                    <button
+                      onClick={() => handleDeleteBooking(booking.id)}
+                      className="text-red-600 hover:text-red-800 text-sm font-medium"
+                    >
+                      Excluir
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ============================================================================
+// COMPONENTE: FORMULÁRIO DE PROPRIEDADE
+// ============================================================================
+const PropertyForm = ({ property, onSave, onCancel, loading }) => {
+  const [formData, setFormData] = useState({
+    title: property?.title || '',
+    description: property?.description || '',
+    address: property?.address || '',
+    pricePerNight: property?.pricePerNight || '',
+    bedrooms: property?.bedrooms || '',
+    bathrooms: property?.bathrooms || '',
+  });
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    // Converte valores numéricos
+    const propertyData = {
+      ...formData,
+      pricePerNight: parseFloat(formData.pricePerNight),
+      bedrooms: parseInt(formData.bedrooms),
+      bathrooms: parseInt(formData.bathrooms),
+    };
+
+    await onSave(propertyData);
+  };
+
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value,
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">
+            {property ? 'Editar Propriedade' : 'Nova Propriedade'}
+          </h3>
+          
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Título
+              </label>
+              <input
+                type="text"
+                name="title"
+                required
+                value={formData.title}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                placeholder="Ex: Casa de Praia em Copacabana"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Descrição
+              </label>
+              <textarea
+                name="description"
+                required
+                value={formData.description}
+                onChange={handleChange}
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                placeholder="Descreva a propriedade..."
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Endereço
+              </label>
+              <input
+                type="text"
+                name="address"
+                required
+                value={formData.address}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                placeholder="Endereço completo"
+              />
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Preço/Noite
+                </label>
+                <input
+                  type="number"
+                  name="pricePerNight"
+                  required
+                  min="0"
+                  step="0.01"
+                  value={formData.pricePerNight}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  placeholder="0.00"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Quartos
+                </label>
+                <input
+                  type="number"
+                  name="bedrooms"
+                  required
+                  min="1"
+                  value={formData.bedrooms}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Banheiros
+                </label>
+                <input
+                  type="number"
+                  name="bathrooms"
+                  required
+                  min="1"
+                  value={formData.bathrooms}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            <div className="flex space-x-3 pt-4">
+              <button
+                type="submit"
+                disabled={loading}
+                className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50"
+              >
+                {loading ? 'Salvando...' : 'Salvar'}
+              </button>
+              <button
+                type="button"
+                onClick={onCancel}
+                className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-400 transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 // ============================================================================
@@ -212,7 +828,8 @@ const LoginPage = ({ onLogin }) => {
         {/* Dica para demo */}
         <div className="text-center">
           <p className="text-xs text-gray-500">
-            Para demo: use qualquer email válido e senha com 6+ caracteres
+            Conectado ao backend real em localhost:3000<br/>
+            <strong>Teste:</strong> admin@test.com / 12345678
           </p>
         </div>
       </div>
@@ -223,18 +840,21 @@ const LoginPage = ({ onLogin }) => {
 // ============================================================================
 // COMPONENTE: CARTÃO DE PROPRIEDADE
 // ============================================================================
-const PropertyCard = ({ property, onCreateBooking }) => {
+const PropertyCard = ({ property, onCreateBooking, onEdit, onDelete, showActions = false }) => {
   const [showBookingForm, setShowBookingForm] = useState(false);
+  const [showBookingsList, setShowBookingsList] = useState(false);
   const [bookingData, setBookingData] = useState({
     startDate: '',
     endDate: '',
     type: 'BLOCKED'
   });
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const handleBookingSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+    setError('');
 
     try {
       await onCreateBooking(property.id, bookingData);
@@ -242,6 +862,13 @@ const PropertyCard = ({ property, onCreateBooking }) => {
       setBookingData({ startDate: '', endDate: '', type: 'BLOCKED' });
     } catch (err) {
       console.error('Erro ao criar bloqueio:', err);
+      
+      if (err.message.startsWith('CONFLICT:')) {
+        const conflictMessage = err.message.replace('CONFLICT: ', '');
+        setError(conflictMessage);
+      } else {
+        setError('Erro ao criar bloqueio. Tente novamente.');
+      }
     } finally {
       setLoading(false);
     }
@@ -300,12 +927,37 @@ const PropertyCard = ({ property, onCreateBooking }) => {
         </div>
 
         {/* Ações */}
+        <div className="flex space-x-2 mb-3">
+          {showActions && (
+            <>
+              <button
+                onClick={() => onEdit(property)}
+                className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
+              >
+                Editar
+              </button>
+              <button
+                onClick={() => onDelete(property.id)}
+                className="flex-1 bg-red-600 text-white py-2 px-4 rounded-md hover:bg-red-700 transition-colors text-sm font-medium"
+              >
+                Excluir
+              </button>
+            </>
+          )}
+        </div>
+
         <div className="flex space-x-2">
           <button
             onClick={() => setShowBookingForm(!showBookingForm)}
             className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
           >
             Criar Bloqueio
+          </button>
+          <button
+            onClick={() => setShowBookingsList(true)}
+            className="flex-1 bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 transition-colors text-sm font-medium"
+          >
+            Ver Bloqueios
           </button>
           <a
             href={calendarUrl}
@@ -320,10 +972,49 @@ const PropertyCard = ({ property, onCreateBooking }) => {
           </a>
         </div>
 
+        {/* Modal para ver e editar bloqueios */}
+        {showBookingsList && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold">Bloqueios da Propriedade</h3>
+                <button
+                  onClick={() => setShowBookingsList(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <BookingsList propertyId={property.id} />
+            </div>
+          </div>
+        )}
+
         {/* Formulário de Bloqueio */}
         {showBookingForm && (
           <div className="mt-4 p-4 bg-gray-50 rounded-md">
             <h4 className="text-sm font-medium text-gray-900 mb-3">Criar Bloqueio</h4>
+            
+            {/* Mensagem de erro */}
+            {error && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
+                <div className="flex items-start">
+                  <svg className="w-5 h-5 text-red-600 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.664-.833-2.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                  <div>
+                    <h5 className="text-sm font-medium text-red-800 mb-1">Conflito de Datas Detectado</h5>
+                    <p className="text-sm text-red-700">{error}</p>
+                    <p className="text-xs text-red-600 mt-2">
+                      💡 <strong>Dica:</strong> Clique em "Ver Bloqueios" para verificar os períodos já ocupados e editar se necessário.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+            
             <form onSubmit={handleBookingSubmit} className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -374,7 +1065,10 @@ const PropertyCard = ({ property, onCreateBooking }) => {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setShowBookingForm(false)}
+                  onClick={() => {
+                    setShowBookingForm(false);
+                    setError('');
+                  }}
                   className="flex-1 bg-gray-300 text-gray-700 py-1 px-3 rounded-md hover:bg-gray-400 transition-colors text-sm font-medium"
                 >
                   Cancelar
@@ -394,6 +1088,9 @@ const PropertyCard = ({ property, onCreateBooking }) => {
 const DashboardPage = ({ user, onLogout }) => {
   const [properties, setProperties] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showPropertyForm, setShowPropertyForm] = useState(false);
+  const [editingProperty, setEditingProperty] = useState(null);
+  const [formLoading, setFormLoading] = useState(false);
   const { token } = useAuth();
 
   // Carrega propriedades ao montar o componente
@@ -416,12 +1113,68 @@ const DashboardPage = ({ user, onLogout }) => {
   const handleCreateBooking = async (propertyId, bookingData) => {
     try {
       await apiService.createBooking(propertyId, bookingData, token);
-      // Aqui você poderia recarregar as propriedades ou mostrar uma notificação
+      alert('✅ Bloqueio criado com sucesso!');
       console.log('Bloqueio criado com sucesso!');
     } catch (err) {
       console.error('Erro ao criar bloqueio:', err);
+      
+      // Se for erro de conflito, deixa o componente PropertyCard tratar a mensagem
+      if (!err.message.startsWith('CONFLICT:')) {
+        alert('❌ Erro ao criar bloqueio. Tente novamente.');
+      }
       throw err;
     }
+  };
+
+  // Handle criar/editar propriedade
+  const handleSaveProperty = async (propertyData) => {
+    setFormLoading(true);
+    try {
+      if (editingProperty) {
+        // Editar propriedade existente
+        const updatedProperty = await apiService.updateProperty(editingProperty.id, propertyData, token);
+        setProperties(props => props.map(p => p.id === editingProperty.id ? updatedProperty : p));
+      } else {
+        // Criar nova propriedade
+        const newProperty = await apiService.createProperty(propertyData, token);
+        setProperties(props => [...props, newProperty]);
+      }
+      
+      setShowPropertyForm(false);
+      setEditingProperty(null);
+    } catch (err) {
+      console.error('Erro ao salvar propriedade:', err);
+      throw err;
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  // Handle editar propriedade
+  const handleEditProperty = (property) => {
+    setEditingProperty(property);
+    setShowPropertyForm(true);
+  };
+
+  // Handle excluir propriedade
+  const handleDeleteProperty = async (propertyId) => {
+    if (!confirm('Tem certeza que deseja excluir esta propriedade?')) {
+      return;
+    }
+
+    try {
+      await apiService.deleteProperty(propertyId, token);
+      setProperties(props => props.filter(p => p.id !== propertyId));
+    } catch (err) {
+      console.error('Erro ao excluir propriedade:', err);
+      alert('Erro ao excluir propriedade. Tente novamente.');
+    }
+  };
+
+  // Handle cancelar formulário
+  const handleCancelForm = () => {
+    setShowPropertyForm(false);
+    setEditingProperty(null);
   };
 
   return (
@@ -432,14 +1185,28 @@ const DashboardPage = ({ user, onLogout }) => {
           <div className="flex justify-between items-center py-6">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Rentals Dashboard</h1>
-              <p className="text-sm text-gray-600">Bem-vindo, {user.email}</p>
+              <div className="flex items-center space-x-2">
+                <p className="text-sm text-gray-600">Bem-vindo, {user.email}</p>
+                <div className="flex items-center text-xs text-green-600">
+                  <div className="w-2 h-2 bg-green-500 rounded-full mr-1"></div>
+                  Conectado
+                </div>
+              </div>
             </div>
-            <button
-              onClick={onLogout}
-              className="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-md transition-colors"
-            >
-              Sair
-            </button>
+            <div className="flex space-x-3">
+              <button
+                onClick={() => setShowPropertyForm(true)}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors"
+              >
+                + Nova Propriedade
+              </button>
+              <button
+                onClick={onLogout}
+                className="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-md transition-colors"
+              >
+                Sair
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -465,6 +1232,9 @@ const DashboardPage = ({ user, onLogout }) => {
                     key={property.id}
                     property={property}
                     onCreateBooking={handleCreateBooking}
+                    onEdit={handleEditProperty}
+                    onDelete={handleDeleteProperty}
+                    showActions={true}
                   />
                 ))
               ) : (
@@ -474,9 +1244,25 @@ const DashboardPage = ({ user, onLogout }) => {
                   </svg>
                   <h3 className="mt-2 text-sm font-medium text-gray-900">Nenhuma propriedade encontrada</h3>
                   <p className="mt-1 text-sm text-gray-500">Comece adicionando uma nova propriedade.</p>
+                  <button
+                    onClick={() => setShowPropertyForm(true)}
+                    className="mt-4 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors"
+                  >
+                    + Adicionar Primeira Propriedade
+                  </button>
                 </div>
               )}
             </div>
+          )}
+
+          {/* Formulário de Propriedade */}
+          {showPropertyForm && (
+            <PropertyForm
+              property={editingProperty}
+              onSave={handleSaveProperty}
+              onCancel={handleCancelForm}
+              loading={formLoading}
+            />
           )}
         </div>
       </main>
@@ -499,13 +1285,39 @@ const App = () => {
     const savedUser = localStorage.getItem('authUser');
     
     if (savedToken && savedUser) {
-      setToken(savedToken);
-      setUser(JSON.parse(savedUser));
-      setPage('dashboard');
+      // Verifica se o token ainda é válido
+      if (isTokenValid(savedToken)) {
+        setToken(savedToken);
+        setUser(JSON.parse(savedUser));
+        setPage('dashboard');
+      } else {
+        // Token expirado - limpa storage
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('authUser');
+        setPage('login');
+      }
+    } else {
+      setPage('login');
     }
   }, []);
 
-  // Função para fazer login
+  // Verifica periodicamente se o token ainda é válido (a cada 30 segundos)
+  useEffect(() => {
+    const checkTokenValidity = () => {
+      const savedToken = localStorage.getItem('authToken');
+      if (savedToken && !isTokenValid(savedToken)) {
+        handleLogout();
+      }
+    };
+
+    // Só configura o timer se estiver logado
+    if (user && token) {
+      const interval = setInterval(checkTokenValidity, 30000); // 30 segundos
+      return () => clearInterval(interval);
+    }
+  }, [user, token]);
+
+  // Função para fazer login (agora totalmente async e conectada ao backend)
   const handleLogin = async (email, password) => {
     try {
       const response = await apiService.login(email, password);
@@ -521,7 +1333,7 @@ const App = () => {
       // Muda para a página do dashboard
       setPage('dashboard');
     } catch (error) {
-      throw error; // Re-throw para que o LoginPage possa tratar
+      throw error; // Re-throw para que o LoginPage possa tratar o erro
     }
   };
 
