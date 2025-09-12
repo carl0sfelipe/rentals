@@ -49,6 +49,9 @@ describe('Calendar E2E', () => {
   });
 
   beforeEach(async () => {
+    // Pequeno delay para evitar conflitos de timestamp
+    await new Promise(resolve => setTimeout(resolve, 20));
+    
     // Limpar dados antes de cada teste
     await (prisma as any).booking.deleteMany({});
     await (prisma as any).property.deleteMany({});
@@ -56,8 +59,10 @@ describe('Calendar E2E', () => {
 
     // Setup inicial: criar dois usuários
     const timestamp = Date.now();
-    userAEmail = `userA-calendar-${timestamp}@test.com`;
-    userBEmail = `userB-calendar-${timestamp}@test.com`;
+    const randomId = Math.floor(Math.random() * 10000);
+    const testPrefix = `calendar-${timestamp}-${randomId}`;
+    userAEmail = `userA-${testPrefix}@test.com`;
+    userBEmail = `userB-${testPrefix}@test.com`;
 
     // Registrar User A
     await request(app.getHttpServer())

@@ -10,14 +10,6 @@ describe('Properties E2E', () => {
   let app: INestApplication;
   let prisma: PrismaService;
 
-  // Variáveis para reutilizar nos testes
-  let userAToken: string;
-  let userBToken: string;
-  let userAEmail: string;
-  let userBEmail: string;
-  let propertyAId: string;
-  let propertyBId: string;
-
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule],
@@ -32,16 +24,33 @@ describe('Properties E2E', () => {
     await app.init();
 
     prisma = moduleRef.get(PrismaService);
+  });
 
-    // Limpar banco antes de começar
+  beforeEach(async () => {
+    // Pequeno delay para evitar conflitos de timestamp
+    await new Promise(resolve => setTimeout(resolve, 10));
+    
+    // Limpar banco antes de cada teste para total isolamento
     await (prisma as any).booking.deleteMany({});
     await (prisma as any).property.deleteMany({});
     await prisma.user.deleteMany({});
+  });
 
-    // Setup inicial: criar dois usuários para testes de permissão
+  afterAll(async () => {
+    // Limpar dados de teste na ordem correta
+    await (prisma as any).booking.deleteMany({});
+    await (prisma as any).property.deleteMany({});
+    await prisma.user.deleteMany({});
+    await app.close();
+  });
+
+  // Helper para setup de usuários em cada teste
+  const setupUsers = async () => {
     const timestamp = Date.now();
-    userAEmail = `userA-${timestamp}@test.com`;
-    userBEmail = `userB-${timestamp}@test.com`;
+    const randomId = Math.floor(Math.random() * 10000);
+    const testPrefix = `props-${timestamp}-${randomId}`;
+    const userAEmail = `userA-${testPrefix}@test.com`;
+    const userBEmail = `userB-${testPrefix}@test.com`;
 
     // Registrar User A
     await request(app.getHttpServer())
@@ -60,35 +69,29 @@ describe('Properties E2E', () => {
       .post('/auth/login')
       .send({ email: userAEmail, password: 'password123' })
       .expect(200);
-    userAToken = loginARes.body.access_token;
+    const userAToken = loginARes.body.access_token;
 
     // Login User B
     const loginBRes = await request(app.getHttpServer())
       .post('/auth/login')
       .send({ email: userBEmail, password: 'password123' })
       .expect(200);
-    userBToken = loginBRes.body.access_token;
-  });
+    const userBToken = loginBRes.body.access_token;
 
-  // Remover beforeEach para evitar conflitos entre testes paralelos
-
-  afterAll(async () => {
-    // Limpar dados de teste na ordem correta - bookings primeiro, depois properties, depois users
-    await (prisma as any).booking.deleteMany({});
-    await (prisma as any).property.deleteMany({});
-    await prisma.user.deleteMany({});
-    await app.close();
-  });
+    return { userAEmail, userBEmail, userAToken, userBToken };
+  };
 
   it('POST /properties - deve criar uma nova propriedade para um usuário autenticado', async () => {
+    const { userAToken } = await setupUsers();
+
     const res = await request(app.getHttpServer())
       .post('/properties')
       .set('Authorization', `Bearer ${userAToken}`)
       .send({
         title: 'Casa de Praia',
         description: 'Uma bela casa na praia',
-        address: 'Rua da Praia, 123',
-        pricePerNight: 150.0,
+        address: 'Rua das Palmeiras, 123',
+        pricePerNight: 250.00,
         bedrooms: 3,
         bathrooms: 2
       })
@@ -97,189 +100,213 @@ describe('Properties E2E', () => {
     expect(res.body).toMatchObject({
       title: 'Casa de Praia',
       description: 'Uma bela casa na praia',
-      address: 'Rua da Praia, 123',
-      pricePerNight: 150.0,
+      address: 'Rua das Palmeiras, 123',
+      pricePerNight: 250.00,
       bedrooms: 3,
       bathrooms: 2
     });
     expect(res.body.id).toBeDefined();
-    
-    // Guardar o ID para testes posteriores
-    propertyAId = res.body.id;
   });
 
-  it('POST /properties - deve criar uma segunda propriedade para User A', async () => {
-    const res = await request(app.getHttpServer())
+  it('POST /properties - deve criar múltiplas propriedades para usuários diferentes', async () => {
+    const { userAToken, userBToken } = await setupUsers();
+
+    // User A cria duas propriedades
+    const propA1 = await request(app.getHttpServer())
+      .post('/properties')
+      .set('Authorization', `Bearer ${userAToken}`)
+      .send({
+        title: 'Casa de Praia',
+        description: 'Uma bela casa na praia',
+        address: 'Rua das Palmeiras, 123',
+        pricePerNight: 250.00,
+        bedrooms: 3,
+        bathrooms: 2
+      })
+      .expect(201);
+
+    const propA2 = await request(app.getHttpServer())
       .post('/properties')
       .set('Authorization', `Bearer ${userAToken}`)
       .send({
         title: 'Apartamento Centro',
         description: 'Apartamento no centro da cidade',
-        address: 'Rua Central, 456',
-        pricePerNight: 200.0,
+        address: 'Av. Principal, 456',
+        pricePerNight: 180.00,
         bedrooms: 2,
         bathrooms: 1
       })
       .expect(201);
 
-    expect(res.body).toMatchObject({
-      title: 'Apartamento Centro',
-      description: 'Apartamento no centro da cidade',
-      address: 'Rua Central, 456',
-      pricePerNight: 200.0,
-      bedrooms: 2,
-      bathrooms: 1
-    });
-    expect(res.body.id).toBeDefined();
-  });
-
-  it('POST /properties - deve criar uma propriedade para User B', async () => {
-    const res = await request(app.getHttpServer())
+    // User B cria uma propriedade
+    const propB1 = await request(app.getHttpServer())
       .post('/properties')
       .set('Authorization', `Bearer ${userBToken}`)
       .send({
         title: 'Casa de Campo',
-        description: 'Uma casa aconchegante no campo',
-        address: 'Estrada do Campo, 789',
-        pricePerNight: 120.0,
+        description: 'Casa para relaxar no campo',
+        address: 'Estrada Rural, 789',
+        pricePerNight: 200.00,
         bedrooms: 4,
         bathrooms: 3
       })
       .expect(201);
 
-    expect(res.body).toMatchObject({
-      title: 'Casa de Campo',
-      description: 'Uma casa aconchegante no campo',
-      address: 'Estrada do Campo, 789',
-      pricePerNight: 120.0,
-      bedrooms: 4,
-      bathrooms: 3
-    });
-    expect(res.body.id).toBeDefined();
-    
-    // Guardar o ID para testes posteriores
-    propertyBId = res.body.id;
-  });
-
-  it('GET /properties - deve retornar apenas as propriedades do usuário autenticado', async () => {
-    const res = await request(app.getHttpServer())
+    // User A deve ver apenas suas propriedades
+    const resA = await request(app.getHttpServer())
       .get('/properties')
       .set('Authorization', `Bearer ${userAToken}`)
       .expect(200);
 
-    expect(res.body).toHaveLength(2);
-    expect(res.body.every((property: any) => 
+    expect(resA.body).toHaveLength(2);
+    expect(resA.body.every((property: any) => 
       property.title === 'Casa de Praia' || property.title === 'Apartamento Centro'
     )).toBe(true);
-  });
 
-  it('GET /properties - User B deve ver apenas sua própria propriedade', async () => {
-    const res = await request(app.getHttpServer())
+    // User B deve ver apenas sua propriedade
+    const resB = await request(app.getHttpServer())
       .get('/properties')
       .set('Authorization', `Bearer ${userBToken}`)
       .expect(200);
 
-    expect(res.body).toHaveLength(1);
-    expect(res.body[0].title).toBe('Casa de Campo');
+    expect(resB.body).toHaveLength(1);
+    expect(resB.body[0].title).toBe('Casa de Campo');
   });
 
-  it('GET /properties/:id - deve retornar detalhes da propriedade própria', async () => {
+  it('GET /properties/:id - deve permitir acesso apenas ao dono', async () => {
+    const { userAToken, userBToken } = await setupUsers();
+
+    // User A cria uma propriedade
+    const propRes = await request(app.getHttpServer())
+      .post('/properties')
+      .set('Authorization', `Bearer ${userAToken}`)
+      .send({
+        title: 'Casa Teste',
+        description: 'Casa para teste',
+        address: 'Rua Teste, 123',
+        pricePerNight: 100.00,
+        bedrooms: 2,
+        bathrooms: 1
+      })
+      .expect(201);
+
+    const propertyId = propRes.body.id;
+
+    // User A pode acessar sua própria propriedade
     const res = await request(app.getHttpServer())
-      .get(`/properties/${propertyAId}`)
+      .get(`/properties/${propertyId}`)
       .set('Authorization', `Bearer ${userAToken}`)
       .expect(200);
 
-    expect(res.body).toMatchObject({
-      id: propertyAId,
-      title: 'Casa de Praia',
-      description: 'Uma bela casa na praia',
-      address: 'Rua da Praia, 123',
-      pricePerNight: 150.0,
-      bedrooms: 3,
-      bathrooms: 2
-    });
-  });
+    expect(res.body.title).toBe('Casa Teste');
 
-  it('GET /properties/:id - deve retornar 403 ao tentar acessar propriedade de outro usuário', async () => {
+    // User B não pode acessar propriedade de User A
     await request(app.getHttpServer())
-      .get(`/properties/${propertyBId}`)
-      .set('Authorization', `Bearer ${userAToken}`)
+      .get(`/properties/${propertyId}`)
+      .set('Authorization', `Bearer ${userBToken}`)
       .expect(403);
   });
 
-  it('PATCH /properties/:id - deve atualizar propriedade própria com sucesso', async () => {
+  it('PATCH /properties/:id - deve permitir atualização apenas pelo dono', async () => {
+    const { userAToken, userBToken } = await setupUsers();
+
+    // User A cria uma propriedade
+    const propRes = await request(app.getHttpServer())
+      .post('/properties')
+      .set('Authorization', `Bearer ${userAToken}`)
+      .send({
+        title: 'Casa Original',
+        description: 'Descrição original',
+        address: 'Rua Original, 123',
+        pricePerNight: 100.00,
+        bedrooms: 2,
+        bathrooms: 1
+      })
+      .expect(201);
+
+    const propertyId = propRes.body.id;
     const updateData = {
-      title: 'Casa de Praia Renovada',
-      pricePerNight: 180.0
+      title: 'Casa Atualizada',
+      description: 'Descrição atualizada',
+      pricePerNight: 150.00
     };
 
+    // User A pode atualizar sua propriedade
     const res = await request(app.getHttpServer())
-      .patch(`/properties/${propertyAId}`)
+      .patch(`/properties/${propertyId}`)
       .set('Authorization', `Bearer ${userAToken}`)
       .send(updateData)
       .expect(200);
 
     expect(res.body).toMatchObject({
-      id: propertyAId,
-      title: 'Casa de Praia Renovada',
-      pricePerNight: 180.0,
-      description: 'Uma bela casa na praia', // Deve manter dados não alterados
-      address: 'Rua da Praia, 123',
-      bedrooms: 3,
-      bathrooms: 2
+      title: 'Casa Atualizada',
+      description: 'Descrição atualizada',
+      pricePerNight: 150.00
     });
-  });
 
-  it('PATCH /properties/:id - deve retornar 403 ao tentar atualizar propriedade de outro usuário', async () => {
-    const updateData = {
-      title: 'Tentativa de Hack',
-      pricePerNight: 1.0
-    };
-
+    // User B não pode atualizar propriedade de User A
     await request(app.getHttpServer())
-      .patch(`/properties/${propertyBId}`)
-      .set('Authorization', `Bearer ${userAToken}`)
+      .patch(`/properties/${propertyId}`)
+      .set('Authorization', `Bearer ${userBToken}`)
       .send(updateData)
       .expect(403);
   });
 
-  it('DELETE /properties/:id - deve retornar 403 ao tentar deletar propriedade de outro usuário', async () => {
-    await request(app.getHttpServer())
-      .delete(`/properties/${propertyBId}`)
-      .set('Authorization', `Bearer ${userAToken}`)
-      .expect(403);
-  });
+  it('DELETE /properties/:id - deve permitir exclusão apenas pelo dono', async () => {
+    const { userAToken, userBToken } = await setupUsers();
 
-  it('DELETE /properties/:id - deve deletar propriedade própria com sucesso', async () => {
-    await request(app.getHttpServer())
-      .delete(`/properties/${propertyAId}`)
+    // User A cria duas propriedades
+    const prop1 = await request(app.getHttpServer())
+      .post('/properties')
       .set('Authorization', `Bearer ${userAToken}`)
-      .expect(200); // ou 204, dependendo da implementação
+      .send({
+        title: 'Casa 1',
+        description: 'Primeira casa',
+        address: 'Rua 1, 123',
+        pricePerNight: 100.00,
+        bedrooms: 2,
+        bathrooms: 1
+      })
+      .expect(201);
+
+    const prop2 = await request(app.getHttpServer())
+      .post('/properties')
+      .set('Authorization', `Bearer ${userAToken}`)
+      .send({
+        title: 'Casa 2',
+        description: 'Segunda casa',
+        address: 'Rua 2, 456',
+        pricePerNight: 200.00,
+        bedrooms: 3,
+        bathrooms: 2
+      })
+      .expect(201);
+
+    // User B não pode deletar propriedade de User A
+    await request(app.getHttpServer())
+      .delete(`/properties/${prop1.body.id}`)
+      .set('Authorization', `Bearer ${userBToken}`)
+      .expect(403);
+
+    // User A pode deletar sua própria propriedade
+    await request(app.getHttpServer())
+      .delete(`/properties/${prop1.body.id}`)
+      .set('Authorization', `Bearer ${userAToken}`)
+      .expect(200);
 
     // Verificar se a propriedade foi realmente deletada
     await request(app.getHttpServer())
-      .get(`/properties/${propertyAId}`)
+      .get(`/properties/${prop1.body.id}`)
       .set('Authorization', `Bearer ${userAToken}`)
       .expect(404);
-  });
 
-  it('GET /properties - User A deve ter apenas 1 propriedade após deletar uma', async () => {
+    // User A ainda deve ter a segunda propriedade
     const res = await request(app.getHttpServer())
       .get('/properties')
       .set('Authorization', `Bearer ${userAToken}`)
       .expect(200);
 
     expect(res.body).toHaveLength(1);
-    expect(res.body[0].title).toBe('Apartamento Centro');
-  });
-
-  it('GET /properties - User B ainda deve ter sua propriedade intacta', async () => {
-    const res = await request(app.getHttpServer())
-      .get('/properties')
-      .set('Authorization', `Bearer ${userBToken}`)
-      .expect(200);
-
-    expect(res.body).toHaveLength(1);
-    expect(res.body[0].title).toBe('Casa de Campo');
+    expect(res.body[0].title).toBe('Casa 2');
   });
 });

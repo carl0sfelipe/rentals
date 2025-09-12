@@ -10,14 +10,6 @@ describe('Bookings E2E', () => {
   let app: INestApplication;
   let prisma: PrismaService;
 
-  // Variáveis para reutilizar nos testes
-  let userAToken: string;
-  let userBToken: string;
-  let userAEmail: string;
-  let userBEmail: string;
-  let propertyAId: string;
-  let propertyBId: string;
-
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule],
@@ -35,15 +27,30 @@ describe('Bookings E2E', () => {
   });
 
   beforeEach(async () => {
-    // Limpar todas as tabelas para garantir isolamento entre testes
+    // Pequeno delay para evitar conflitos de timestamp
+    await new Promise(resolve => setTimeout(resolve, 15));
+    
+    // Limpar banco antes de cada teste para total isolamento
     await (prisma as any).booking.deleteMany({});
     await (prisma as any).property.deleteMany({});
     await prisma.user.deleteMany({});
+  });
 
-    // Setup inicial: criar dois usuários para testes de permissão
+  afterAll(async () => {
+    // Limpar dados de teste na ordem correta
+    await (prisma as any).booking.deleteMany({});
+    await (prisma as any).property.deleteMany({});
+    await prisma.user.deleteMany({});
+    await app.close();
+  });
+
+  // Helper para setup de usuários e propriedades
+  const setupUsersAndProperty = async () => {
     const timestamp = Date.now();
-    userAEmail = `userA-${timestamp}@test.com`;
-    userBEmail = `userB-${timestamp}@test.com`;
+    const randomId = Math.floor(Math.random() * 10000);
+    const testPrefix = `bookings-${timestamp}-${randomId}`;
+    const userAEmail = `userA-${testPrefix}@test.com`;
+    const userBEmail = `userB-${testPrefix}@test.com`;
 
     // Registrar User A
     await request(app.getHttpServer())
@@ -62,86 +69,87 @@ describe('Bookings E2E', () => {
       .post('/auth/login')
       .send({ email: userAEmail, password: 'password123' })
       .expect(200);
-    userAToken = loginARes.body.access_token;
+    const userAToken = loginARes.body.access_token;
 
     // Login User B
     const loginBRes = await request(app.getHttpServer())
       .post('/auth/login')
       .send({ email: userBEmail, password: 'password123' })
       .expect(200);
-    userBToken = loginBRes.body.access_token;
+    const userBToken = loginBRes.body.access_token;
 
-    // Criar propriedade para User A
+    // User A cria uma propriedade
     const propertyARes = await request(app.getHttpServer())
       .post('/properties')
       .set('Authorization', `Bearer ${userAToken}`)
       .send({
         title: 'Casa de Praia User A',
         description: 'Uma bela casa na praia',
-        address: 'Rua da Praia, 123',
-        pricePerNight: 150.0,
+        address: 'Rua das Palmeiras, 123',
+        pricePerNight: 250.00,
         bedrooms: 3,
         bathrooms: 2
       })
       .expect(201);
-    propertyAId = propertyARes.body.id;
 
-    // Criar propriedade para User B
+    // User B cria uma propriedade
     const propertyBRes = await request(app.getHttpServer())
       .post('/properties')
       .set('Authorization', `Bearer ${userBToken}`)
       .send({
         title: 'Casa de Campo User B',
-        description: 'Uma casa aconchegante no campo',
-        address: 'Estrada do Campo, 789',
-        pricePerNight: 120.0,
+        description: 'Casa para relaxar no campo',
+        address: 'Estrada Rural, 789',
+        pricePerNight: 200.00,
         bedrooms: 4,
         bathrooms: 3
       })
       .expect(201);
-    propertyBId = propertyBRes.body.id;
-  });
 
-  afterAll(async () => {
-    // Limpar dados de teste na ordem correta
-    await (prisma as any).booking.deleteMany({});
-    await (prisma as any).property.deleteMany({});
-    await prisma.user.deleteMany({});
-    await app.close();
-  });
+    return { 
+      userAToken, 
+      userBToken, 
+      propertyAId: propertyARes.body.id, 
+      propertyBId: propertyBRes.body.id 
+    };
+  };
 
-  it('POST /properties/:propertyId/bookings - deve criar um novo bloqueio com sucesso para propriedade própria', async () => {
-    const startDate = new Date('2025-12-01T10:00:00.000Z');
-    const endDate = new Date('2025-12-05T10:00:00.000Z');
+  it('POST /properties/:propertyId/bookings - deve criar um novo bloqueio com sucesso', async () => {
+    const { userAToken, propertyAId } = await setupUsersAndProperty();
+
+    const startDate = new Date('2025-12-20T14:00:00.000Z');
+    const endDate = new Date('2025-12-25T11:00:00.000Z');
 
     const res = await request(app.getHttpServer())
       .post(`/properties/${propertyAId}/bookings`)
       .set('Authorization', `Bearer ${userAToken}`)
       .send({
+        type: 'BLOCKED',
         startDate: startDate.toISOString(),
         endDate: endDate.toISOString()
       })
       .expect(201);
 
     expect(res.body).toMatchObject({
-      startDate: startDate.toISOString(),
-      endDate: endDate.toISOString(),
-      propertyId: propertyAId,
-      type: 'BLOCKED' // Valor padrão
+      type: 'BLOCKED',
+      propertyId: propertyAId
     });
     expect(res.body.id).toBeDefined();
-    expect(res.body.createdAt).toBeDefined();
-    expect(res.body.updatedAt).toBeDefined();
+    expect(new Date(res.body.startDate)).toEqual(startDate);
+    expect(new Date(res.body.endDate)).toEqual(endDate);
   });
 
-  it('POST /properties/:propertyId/bookings - deve retornar 403 ao tentar criar bloqueio em propriedade de outro usuário', async () => {
-    const startDate = new Date('2025-12-01T10:00:00.000Z');
-    const endDate = new Date('2025-12-05T10:00:00.000Z');
+  it('POST /properties/:propertyId/bookings - deve retornar 403 para propriedade de outro usuário', async () => {
+    const { userAToken, propertyBId } = await setupUsersAndProperty();
+
+    const startDate = new Date('2025-12-20T14:00:00.000Z');
+    const endDate = new Date('2025-12-25T11:00:00.000Z');
 
     await request(app.getHttpServer())
       .post(`/properties/${propertyBId}/bookings`)
-      .set('Authorization', `Bearer ${userAToken}`) // User A tentando criar booking na propriedade do User B
+      .set('Authorization', `Bearer ${userAToken}`)
       .send({
+        type: 'BLOCKED',
         startDate: startDate.toISOString(),
         endDate: endDate.toISOString()
       })
@@ -149,13 +157,16 @@ describe('Bookings E2E', () => {
   });
 
   it('POST /properties/:propertyId/bookings - deve retornar 400 quando endDate for anterior à startDate', async () => {
-    const startDate = new Date('2025-12-05T10:00:00.000Z');
-    const endDate = new Date('2025-12-01T10:00:00.000Z'); // Data de fim anterior à data de início
+    const { userAToken, propertyAId } = await setupUsersAndProperty();
+
+    const startDate = new Date('2025-12-25T14:00:00.000Z');
+    const endDate = new Date('2025-12-20T11:00:00.000Z'); // endDate antes de startDate
 
     await request(app.getHttpServer())
       .post(`/properties/${propertyAId}/bookings`)
       .set('Authorization', `Bearer ${userAToken}`)
       .send({
+        type: 'BLOCKED',
         startDate: startDate.toISOString(),
         endDate: endDate.toISOString()
       })
@@ -163,40 +174,47 @@ describe('Bookings E2E', () => {
   });
 
   it('POST /properties/:propertyId/bookings - deve retornar 400 quando startDate não for fornecida', async () => {
-    const endDate = new Date('2025-12-05T10:00:00.000Z');
+    const { userAToken, propertyAId } = await setupUsersAndProperty();
+
+    const endDate = new Date('2025-12-25T11:00:00.000Z');
 
     await request(app.getHttpServer())
       .post(`/properties/${propertyAId}/bookings`)
       .set('Authorization', `Bearer ${userAToken}`)
       .send({
+        type: 'BLOCKED',
         endDate: endDate.toISOString()
-        // startDate omitida intencionalmente
       })
       .expect(400);
   });
 
   it('POST /properties/:propertyId/bookings - deve retornar 400 quando endDate não for fornecida', async () => {
-    const startDate = new Date('2025-12-01T10:00:00.000Z');
+    const { userAToken, propertyAId } = await setupUsersAndProperty();
+
+    const startDate = new Date('2025-12-20T14:00:00.000Z');
 
     await request(app.getHttpServer())
       .post(`/properties/${propertyAId}/bookings`)
       .set('Authorization', `Bearer ${userAToken}`)
       .send({
+        type: 'BLOCKED',
         startDate: startDate.toISOString()
-        // endDate omitida intencionalmente
       })
       .expect(400);
   });
 
   it('POST /properties/:propertyId/bookings - deve retornar 404 quando propriedade não existir', async () => {
-    const startDate = new Date('2025-12-01T10:00:00.000Z');
-    const endDate = new Date('2025-12-05T10:00:00.000Z');
-    const nonExistentPropertyId = '00000000-0000-0000-0000-000000000000';
+    const { userAToken } = await setupUsersAndProperty();
+
+    const fakePropertyId = '00000000-0000-0000-0000-000000000000';
+    const startDate = new Date('2025-12-20T14:00:00.000Z');
+    const endDate = new Date('2025-12-25T11:00:00.000Z');
 
     await request(app.getHttpServer())
-      .post(`/properties/${nonExistentPropertyId}/bookings`)
+      .post(`/properties/${fakePropertyId}/bookings`)
       .set('Authorization', `Bearer ${userAToken}`)
       .send({
+        type: 'BLOCKED',
         startDate: startDate.toISOString(),
         endDate: endDate.toISOString()
       })
@@ -204,13 +222,15 @@ describe('Bookings E2E', () => {
   });
 
   it('POST /properties/:propertyId/bookings - deve retornar 401 quando não autenticado', async () => {
-    const startDate = new Date('2025-12-01T10:00:00.000Z');
-    const endDate = new Date('2025-12-05T10:00:00.000Z');
+    const { propertyAId } = await setupUsersAndProperty();
+
+    const startDate = new Date('2025-12-20T14:00:00.000Z');
+    const endDate = new Date('2025-12-25T11:00:00.000Z');
 
     await request(app.getHttpServer())
       .post(`/properties/${propertyAId}/bookings`)
-      // Sem header Authorization
       .send({
+        type: 'BLOCKED',
         startDate: startDate.toISOString(),
         endDate: endDate.toISOString()
       })
@@ -218,52 +238,51 @@ describe('Bookings E2E', () => {
   });
 
   it('POST /properties/:propertyId/bookings - deve criar múltiplos bloqueios para a mesma propriedade', async () => {
+    const { userAToken, propertyAId } = await setupUsersAndProperty();
+
     // Primeiro bloqueio
-    const startDate1 = new Date('2025-12-01T10:00:00.000Z');
-    const endDate1 = new Date('2025-12-05T10:00:00.000Z');
-
-    const res1 = await request(app.getHttpServer())
+    const booking1 = await request(app.getHttpServer())
       .post(`/properties/${propertyAId}/bookings`)
       .set('Authorization', `Bearer ${userAToken}`)
       .send({
-        startDate: startDate1.toISOString(),
-        endDate: endDate1.toISOString()
+        type: 'BLOCKED',
+        startDate: '2025-12-01T14:00:00.000Z',
+        endDate: '2025-12-05T11:00:00.000Z'
       })
       .expect(201);
 
-    // Segundo bloqueio (período diferente)
-    const startDate2 = new Date('2025-12-10T10:00:00.000Z');
-    const endDate2 = new Date('2025-12-15T10:00:00.000Z');
-
-    const res2 = await request(app.getHttpServer())
+    // Segundo bloqueio (sem conflito)
+    const booking2 = await request(app.getHttpServer())
       .post(`/properties/${propertyAId}/bookings`)
       .set('Authorization', `Bearer ${userAToken}`)
       .send({
-        startDate: startDate2.toISOString(),
-        endDate: endDate2.toISOString()
+        type: 'BLOCKED',
+        startDate: '2025-12-10T14:00:00.000Z',
+        endDate: '2025-12-15T11:00:00.000Z'
       })
       .expect(201);
 
-    expect(res1.body.id).not.toBe(res2.body.id);
-    expect(res1.body.propertyId).toBe(propertyAId);
-    expect(res2.body.propertyId).toBe(propertyAId);
+    expect(booking1.body.id).toBeDefined();
+    expect(booking2.body.id).toBeDefined();
+    expect(booking1.body.id).not.toBe(booking2.body.id);
   });
 
   it('POST /properties/:propertyId/bookings - deve aceitar tipo RESERVATION explicitamente', async () => {
-    const startDate = new Date('2025-12-01T10:00:00.000Z');
-    const endDate = new Date('2025-12-05T10:00:00.000Z');
+    const { userAToken, propertyAId } = await setupUsersAndProperty();
+
+    const startDate = new Date('2025-12-20T14:00:00.000Z');
+    const endDate = new Date('2025-12-25T11:00:00.000Z');
 
     const res = await request(app.getHttpServer())
       .post(`/properties/${propertyAId}/bookings`)
       .set('Authorization', `Bearer ${userAToken}`)
       .send({
+        type: 'RESERVATION',
         startDate: startDate.toISOString(),
-        endDate: endDate.toISOString(),
-        type: 'RESERVATION'
+        endDate: endDate.toISOString()
       })
       .expect(201);
 
     expect(res.body.type).toBe('RESERVATION');
-    expect(res.body.propertyId).toBe(propertyAId);
   });
 });

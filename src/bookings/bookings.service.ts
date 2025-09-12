@@ -87,7 +87,7 @@ export class BookingsService {
     }
 
     // Se tudo estiver certo, criar o novo Booking
-    const booking = await (this.prisma as any).booking.create({
+    const booking = await this.prisma.booking.create({
       data: {
         startDate,
         endDate,

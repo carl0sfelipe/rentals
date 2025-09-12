@@ -29,9 +29,15 @@ const properties: Property[] = [];
 const prismaMock = {
   property: {
     create: vi.fn(async ({ data }) => {
-      const newProp: Property = { id: String(properties.length + 1), ...data };
+      const newProp: Property = { id: String(properties.length + 1), ownerId: data.userId, ...data };
       properties.push(newProp);
       return newProp;
+    }),
+    findMany: vi.fn(async ({ where }) => {
+      if (where?.userId) {
+        return properties.filter(p => p.ownerId === where.userId);
+      }
+      return properties;
     }),
     findUnique: vi.fn(async ({ where: { id } }) => properties.find((p) => p.id === id) || null),
     update: vi.fn(async ({ where: { id }, data }) => {
