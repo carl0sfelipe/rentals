@@ -1,7 +1,7 @@
 # docker-compose.yml
 # Stack completo de desenvolvimento: React Frontend + NestJS API + PostgreSQL
-# Execução: docker compose up --build
-# Frontend: http://localhost:5173 | API: http://localhost:3000 | DB: localhost:5433
+# Execução: docker compose up --build (dev) | docker compose -f docker-compose.test.yml up (test)
+# Frontend: http://localhost:5173 | API: http://localhost:3000 | DB Dev: localhost:5433
 
 services:
   api:
@@ -17,11 +17,11 @@ services:
     command: sh -c "npx prisma generate && npm run start:dev"
     ports:
       - "3000:3000"
-    env_file: .env
+    env_file: .env.development
     environment:
       - PORT=3000
     depends_on:
-      db:
+      db_dev:
         condition: service_healthy
     # Reinicia automaticamente se cair (útil em dev)
     restart: unless-stopped
@@ -32,16 +32,16 @@ services:
       retries: 5
       start_period: 15s
 
-  db:
-    container_name: rentals_db
+  db_dev:
+    container_name: rentals_db_dev
     image: postgres:16-alpine
-    env_file: .env
+    env_file: .env.development
     ports:
-      # Permite alterar a porta do host via .env (DB_HOST_PORT). Default 5433 evita conflito com Postgres local.
+      # Porta 5433 para desenvolvimento
       - "${DB_HOST_PORT:-5433}:5432"
     volumes:
-      # Volume nomeado para persistência dos dados entre recriações de container
-      - pgdata:/var/lib/postgresql/data
+      # Volume específico para desenvolvimento
+      - pgdata_dev:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
       interval: 10s
@@ -74,30 +74,16 @@ services:
       retries: 3
       start_period: 10s
 
-  test:
-    container_name: rentals_api_test
-    build:
-      context: .
-      target: development
-      args:
-        - NODE_VERSION=20-alpine
-    command: sh -c "npx prisma generate && npm run test"
-    volumes:
-      - ./:/usr/src/app
-    env_file: .env
-    depends_on:
-      db:
-        condition: service_healthy
-    # Não precisa expor portas para testes
-    restart: "no"
-
 volumes:
-  pgdata:
-    # Volume nomeado; driver padrão local é suficiente.
+  pgdata_dev:
+    # Volume para dados de desenvolvimento
+  pgdata_test:
+    # Volume para dados de teste (isolado)
 
 # Observações:
-# - Copie .env.example para .env antes de subir.
-# - Frontend disponível em: http://localhost:5173
+# - DESENVOLVIMENTO: docker compose up --build (usa .env.development)
+# - TESTES: docker compose -f docker-compose.test.yml up (usa .env.test)
+# - Frontend disponível em: http://localhost:5173 (apenas em desenvolvimento)
 # - API disponível em: http://localhost:3000  
 # - Banco de dados: localhost:5433 (ou defina DB_HOST_PORT no .env)
 # - Executar migrações: docker compose exec api <comando>

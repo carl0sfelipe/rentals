@@ -15,6 +15,12 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
     },
+    // Configurações de ambiente para testes
+    env: {
+      DATABASE_URL: "postgresql://user:password@localhost:5433/rentaldb",
+      JWT_SECRET: "test-secret-key",
+      NODE_ENV: "test"
+    },
     // Execução sequencial para evitar conflitos nos testes E2E
     pool: 'forks',
     poolOptions: {

@@ -31,15 +31,15 @@ describe('Properties E2E', () => {
     await new Promise(resolve => setTimeout(resolve, 10));
     
     // Limpar banco antes de cada teste para total isolamento
-    await (prisma as any).booking.deleteMany({});
-    await (prisma as any).property.deleteMany({});
+    await prisma.booking.deleteMany({});
+    await prisma.property.deleteMany({});
     await prisma.user.deleteMany({});
   });
 
   afterAll(async () => {
     // Limpar dados de teste na ordem correta
-    await (prisma as any).booking.deleteMany({});
-    await (prisma as any).property.deleteMany({});
+    await prisma.booking.deleteMany({});
+    await prisma.property.deleteMany({});
     await prisma.user.deleteMany({});
     await app.close();
   });

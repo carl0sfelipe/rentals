@@ -4,10 +4,13 @@ import { PrismaService } from '../prisma/prisma.service';
 interface PropertyDto { 
   title: string; 
   description: string; 
-  address: string; 
-  pricePerNight: number; 
-  bedrooms: number; 
-  bathrooms: number; 
+  location?: string; // Compatibilidade com frontend
+  address?: string; 
+  price?: number; // Aceita price do frontend
+  pricePerNight?: number; 
+  bedrooms?: number; 
+  bathrooms?: number;
+  amenities?: string[]; // Para compatibilidade 
 }
 interface UpdatePropertyDto { 
   title?: string; 
@@ -23,11 +26,18 @@ export class PropertiesService {
   constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
   async create(userId: string, data: PropertyDto) {
+    const propertyData = {
+      title: data.title,
+      description: data.description,
+      address: data.address || data.location || '', // Mapeia location para address
+      pricePerNight: data.pricePerNight || data.price || 0, // Mapeia price para pricePerNight
+      bedrooms: data.bedrooms || 1,
+      bathrooms: data.bathrooms || 1,
+      userId: userId
+    };
+    
     return this.prisma.property.create({ 
-      data: { 
-        ...data, 
-        userId: userId 
-      } 
+      data: propertyData
     });
   }
 
