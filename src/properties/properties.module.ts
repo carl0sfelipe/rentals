@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PropertiesService } from './properties.service';
 import { PropertiesController } from './properties.controller';
-import { OrganizationsModule } from '../organizations/organizations.module';
+import { UnsplashService } from '../unsplash/unsplash.service';
 
 @Module({
   imports: [
@@ -10,9 +10,8 @@ import { OrganizationsModule } from '../organizations/organizations.module';
       secret: process.env.JWT_SECRET || 'your-secret-key',
       signOptions: { expiresIn: '1h' },
     }),
-    OrganizationsModule,
   ],
   controllers: [PropertiesController],
-  providers: [PropertiesService],
+  providers: [PropertiesService, UnsplashService],
 })
 export class PropertiesModule {}

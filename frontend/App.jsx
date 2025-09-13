@@ -742,7 +742,10 @@ const PropertyForm = ({ property, onSave, onCancel, loading }) => {
     pricePerNight: property?.pricePerNight || '',
     bedrooms: property?.bedrooms || '',
     bathrooms: property?.bathrooms || '',
+    imageUrl: property?.imageUrl || '',
   });
+
+  const [imagePreview, setImagePreview] = useState(property?.imageUrl || '');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -759,10 +762,31 @@ const PropertyForm = ({ property, onSave, onCancel, loading }) => {
   };
 
   const handleChange = (e) => {
+    const { name, value } = e.target;
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value,
+      [name]: value,
     });
+
+    // Atualizar preview da imagem quando URL da imagem mudar
+    if (name === 'imageUrl') {
+      setImagePreview(value);
+    }
+  };
+
+  const generateRandomImage = async () => {
+    try {
+      const response = await fetch('http://localhost:3000/unsplash/random');
+      const data = await response.json();
+      setFormData({ ...formData, imageUrl: data.imageUrl });
+      setImagePreview(data.imageUrl);
+    } catch (error) {
+      console.error('Erro ao gerar imagem:', error);
+      // Fallback para URL direta
+      const fallbackUrl = `https://source.unsplash.com/800x600/?architecture,interior,home,apartment,house,modern&${Date.now()}`;
+      setFormData({ ...formData, imageUrl: fallbackUrl });
+      setImagePreview(fallbackUrl);
+    }
   };
 
   return (
@@ -817,6 +841,54 @@ const PropertyForm = ({ property, onSave, onCancel, loading }) => {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
                 placeholder="Endereço completo"
               />
+            </div>
+
+            {/* Campo de Imagem */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                URL da Imagem (opcional)
+              </label>
+              <div className="space-y-2">
+                <div className="flex space-x-2">
+                  <input
+                    type="url"
+                    name="imageUrl"
+                    value={formData.imageUrl}
+                    onChange={handleChange}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    placeholder="https://exemplo.com/imagem.jpg"
+                  />
+                  <button
+                    type="button"
+                    onClick={generateRandomImage}
+                    className="px-3 py-2 text-sm bg-green-100 text-green-700 rounded-md hover:bg-green-200 transition-colors"
+                    title="Gerar imagem aleatória"
+                  >
+                    🎲 Aleatória
+                  </button>
+                </div>
+                
+                {/* Preview da Imagem */}
+                {imagePreview && (
+                  <div className="mt-2">
+                    <img
+                      src={imagePreview}
+                      alt="Preview"
+                      className="w-full h-32 object-cover rounded-md border"
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                      }}
+                      onLoad={(e) => {
+                        e.target.style.display = 'block';
+                      }}
+                    />
+                  </div>
+                )}
+                
+                <p className="text-xs text-gray-500">
+                  Se não fornecida, uma imagem automática será gerada
+                </p>
+              </div>
             </div>
 
             <div className="grid grid-cols-3 gap-3">

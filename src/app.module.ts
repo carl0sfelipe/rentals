@@ -10,6 +10,8 @@ import { BookingsModule } from './bookings/bookings.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { OrganizationsModule } from './organizations/organizations.module';
 import { ConfigController } from './config/config.controller';
+import { UnsplashController } from './unsplash/unsplash.controller';
+import { UnsplashService } from './unsplash/unsplash.service';
 import { OrganizationContextMiddleware } from './organizations/organization-context.middleware';
 import { isMultiTenantEnabled, isOrganizationContextEnabled } from './config/feature-flags';
 
@@ -24,8 +26,8 @@ import { isMultiTenantEnabled, isOrganizationContextEnabled } from './config/fea
     PropertiesModule, 
     BookingsModule
   ],
-  controllers: [AppController, ConfigController],
-  providers: [AppService],
+  controllers: [AppController, ConfigController, UnsplashController],
+  providers: [AppService, UnsplashService],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {

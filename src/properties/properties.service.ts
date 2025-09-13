@@ -1,7 +1,6 @@
 import { ForbiddenException, Injectable, NotFoundException, Inject } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { OrganizationContextService } from '../organizations/organization-context.service';
-import { isTenantIsolationEnabled } from '../config/feature-flags';
+import { UnsplashService } from '../unsplash/unsplash.service';
 
 interface PropertyDto { 
   title: string; 
@@ -12,6 +11,7 @@ interface PropertyDto {
   pricePerNight?: number; 
   bedrooms?: number; 
   bathrooms?: number;
+  imageUrl?: string; // Nova propriedade para imagem
   amenities?: string[]; // Para compatibilidade 
 }
 interface UpdatePropertyDto { 
@@ -21,16 +21,20 @@ interface UpdatePropertyDto {
   pricePerNight?: number; 
   bedrooms?: number; 
   bathrooms?: number; 
+  imageUrl?: string; // Nova propriedade para imagem
 }
 
 @Injectable()
 export class PropertiesService {
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
-    private readonly organizationContext: OrganizationContextService
+    private readonly unsplashService: UnsplashService
   ) {}
 
   async create(userId: string, data: PropertyDto) {
+    // Se não há imageUrl fornecida, usar uma imagem do Unsplash
+    const imageUrl = data.imageUrl || this.unsplashService.getRandomCuratedArchitectureImage();
+    
     const propertyData = {
       title: data.title,
       description: data.description,
@@ -38,23 +42,9 @@ export class PropertiesService {
       pricePerNight: data.pricePerNight || data.price || 0, // Mapeia price para pricePerNight
       bedrooms: data.bedrooms || 1,
       bathrooms: data.bathrooms || 1,
+      imageUrl: imageUrl, // Adicionar imageUrl
       userId: userId
     };
-
-    // Adicionar organizationId se multi-tenant estiver habilitado
-    if (isTenantIsolationEnabled()) {
-      const activeOrgId = this.organizationContext.getActiveOrganizationId();
-      console.log('🏢 PropertiesService.create - Organization context:', {
-        isTenantIsolationEnabled: isTenantIsolationEnabled(),
-        activeOrgId,
-        hasContext: this.organizationContext.hasContext(),
-        fullContext: this.organizationContext.getContext()
-      });
-      
-      if (activeOrgId) {
-        (propertyData as any).organizationId = activeOrgId;
-      }
-    }
     
     return this.prisma.property.create({ 
       data: propertyData
@@ -62,17 +52,7 @@ export class PropertiesService {
   }
 
   async findAll(userId: string) {
-    const where: any = { userId };
-    
-    // Adicionar filtro de organizationId se multi-tenant estiver habilitado
-    if (isTenantIsolationEnabled()) {
-      const activeOrgId = this.organizationContext.getActiveOrganizationId();
-      if (activeOrgId) {
-        where.organizationId = activeOrgId;
-      }
-    }
-    
-    return this.prisma.property.findMany({ where });
+    return this.prisma.property.findMany({ where: { userId } });
   }
 
   async findOne(userId: string, id: string) {
@@ -86,7 +66,14 @@ export class PropertiesService {
     const property = await this.prisma.property.findUnique({ where: { id } });
     if (!property) throw new NotFoundException('Property not found');
     if (property.userId !== userId) throw new ForbiddenException();
-    return this.prisma.property.update({ where: { id }, data });
+    
+    // Se não há imageUrl na atualização e a propriedade atual não tem imagem, gerar uma nova
+    const updateData = { ...data };
+    if (!updateData.imageUrl && !property.imageUrl) {
+      updateData.imageUrl = this.unsplashService.getRandomCuratedArchitectureImage();
+    }
+    
+    return this.prisma.property.update({ where: { id }, data: updateData });
   }
 
   async remove(userId: string, id: string) {
