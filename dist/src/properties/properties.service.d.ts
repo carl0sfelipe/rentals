@@ -27,6 +27,10 @@ export declare class PropertiesService {
     constructor(prisma: PrismaService, unsplashService: UnsplashService);
     create(userId: string, data: PropertyDto): Promise<{
         id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        userId: string;
+        organizationId: string | null;
         title: string;
         description: string;
         address: string;
@@ -34,13 +38,13 @@ export declare class PropertiesService {
         bedrooms: number;
         bathrooms: number;
         imageUrl: string | null;
-        createdAt: Date;
-        updatedAt: Date;
-        organizationId: string | null;
-        userId: string;
     }>;
     findAll(userId: string): Promise<{
         id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        userId: string;
+        organizationId: string | null;
         title: string;
         description: string;
         address: string;
@@ -48,13 +52,13 @@ export declare class PropertiesService {
         bedrooms: number;
         bathrooms: number;
         imageUrl: string | null;
-        createdAt: Date;
-        updatedAt: Date;
-        organizationId: string | null;
-        userId: string;
     }[]>;
     findOne(userId: string, id: string): Promise<{
         id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        userId: string;
+        organizationId: string | null;
         title: string;
         description: string;
         address: string;
@@ -62,13 +66,13 @@ export declare class PropertiesService {
         bedrooms: number;
         bathrooms: number;
         imageUrl: string | null;
-        createdAt: Date;
-        updatedAt: Date;
-        organizationId: string | null;
-        userId: string;
     }>;
     update(userId: string, id: string, data: UpdatePropertyDto): Promise<{
         id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        userId: string;
+        organizationId: string | null;
         title: string;
         description: string;
         address: string;
@@ -76,10 +80,6 @@ export declare class PropertiesService {
         bedrooms: number;
         bathrooms: number;
         imageUrl: string | null;
-        createdAt: Date;
-        updatedAt: Date;
-        organizationId: string | null;
-        userId: string;
     }>;
     remove(userId: string, id: string): Promise<{
         deleted: boolean;
