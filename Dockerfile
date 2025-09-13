@@ -1,5 +1,22 @@
 # Dockerfile multi-stage para aplicação NestJS
+# -------# ------------------------------------------------------------
+# Stage production: imagem final otimizada
 # ------------------------------------------------------------
+FROM node:${NODE_VERSION} AS production
+ENV NODE_ENV=production
+WORKDIR /usr/src/app
+
+# Copiar arquivos de manifesto e schema do Prisma primeiro
+COPY --chown=node:node package*.json ./
+COPY --chown=node:node prisma ./prisma
+
+# Instalar apenas dependências de produção e gerar Prisma client
+RUN if [ -f package-lock.json ]; then npm ci --omit=dev; else npm install --omit=dev; fi \
+  && npx prisma generate \
+  && npm cache clean --force
+
+# Copiamos somente a pasta dist do stage build (código transpilado).
+COPY --from=build --chown=node:node /usr/src/app/dist ./dist---------------------------------------
 # Objetivos:
 # 1. Fornecer um ambiente de desenvolvimento (hot reload) usando o target "development".
 # 2. Gerar uma imagem de produção minimalista, copiando apenas artefatos necessários.
