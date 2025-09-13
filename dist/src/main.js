@@ -5,16 +5,28 @@ const app_module_1 = require("./app.module");
 const common_1 = require("@nestjs/common");
 async function bootstrap() {
     const app = await core_1.NestFactory.create(app_module_1.AppModule);
+    const allowedOrigins = [
+        'http://localhost:5173',
+        'http://localhost:3000',
+        'https://rentals-frontend.vercel.app',
+        process.env.FRONTEND_URL,
+        process.env.CORS_ORIGINS?.split(',') || []
+    ].flat().filter(Boolean);
     app.enableCors({
-        origin: ['http://localhost:5173', 'http://localhost:3000'],
+        origin: allowedOrigins,
         methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
         allowedHeaders: ['Content-Type', 'Authorization'],
         credentials: true,
     });
-    app.useGlobalPipes(new common_1.ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
+    app.useGlobalPipes(new common_1.ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true
+    }));
     const port = process.env.PORT || 3000;
-    await app.listen(port);
-    console.log(`API running on port ${port}`);
+    await app.listen(port, '0.0.0.0');
+    console.log(`🚀 API running on port ${port}`);
+    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
 }
 bootstrap();
 //# sourceMappingURL=main.js.map

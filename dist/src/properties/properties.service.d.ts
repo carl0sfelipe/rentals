@@ -1,5 +1,5 @@
 import { PrismaService } from '../prisma/prisma.service';
-import { OrganizationContextService } from '../organizations/organization-context.service';
+import { UnsplashService } from '../unsplash/unsplash.service';
 interface PropertyDto {
     title: string;
     description: string;
@@ -9,6 +9,7 @@ interface PropertyDto {
     pricePerNight?: number;
     bedrooms?: number;
     bathrooms?: number;
+    imageUrl?: string;
     amenities?: string[];
 }
 interface UpdatePropertyDto {
@@ -18,62 +19,67 @@ interface UpdatePropertyDto {
     pricePerNight?: number;
     bedrooms?: number;
     bathrooms?: number;
+    imageUrl?: string;
 }
 export declare class PropertiesService {
     private readonly prisma;
-    private readonly organizationContext;
-    constructor(prisma: PrismaService, organizationContext: OrganizationContextService);
+    private readonly unsplashService;
+    constructor(prisma: PrismaService, unsplashService: UnsplashService);
     create(userId: string, data: PropertyDto): Promise<{
         id: string;
-        createdAt: Date;
-        updatedAt: Date;
-        userId: string;
-        organizationId: string | null;
         title: string;
         description: string;
         address: string;
         pricePerNight: number;
         bedrooms: number;
         bathrooms: number;
+        imageUrl: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+        organizationId: string | null;
+        userId: string;
     }>;
     findAll(userId: string): Promise<{
         id: string;
-        createdAt: Date;
-        updatedAt: Date;
-        userId: string;
-        organizationId: string | null;
         title: string;
         description: string;
         address: string;
         pricePerNight: number;
         bedrooms: number;
         bathrooms: number;
+        imageUrl: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+        organizationId: string | null;
+        userId: string;
     }[]>;
     findOne(userId: string, id: string): Promise<{
         id: string;
-        createdAt: Date;
-        updatedAt: Date;
-        userId: string;
-        organizationId: string | null;
         title: string;
         description: string;
         address: string;
         pricePerNight: number;
         bedrooms: number;
         bathrooms: number;
+        imageUrl: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+        organizationId: string | null;
+        userId: string;
     }>;
     update(userId: string, id: string, data: UpdatePropertyDto): Promise<{
         id: string;
-        createdAt: Date;
-        updatedAt: Date;
-        userId: string;
-        organizationId: string | null;
         title: string;
         description: string;
         address: string;
         pricePerNight: number;
         bedrooms: number;
         bathrooms: number;
+        imageUrl: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+        organizationId: string | null;
+        userId: string;
     }>;
     remove(userId: string, id: string): Promise<{
         deleted: boolean;

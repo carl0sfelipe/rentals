@@ -71,6 +71,7 @@ model Property {
   pricePerNight Float
   bedrooms      Int
   bathrooms     Int
+  imageUrl      String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 

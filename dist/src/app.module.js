@@ -19,6 +19,8 @@ const bookings_module_1 = require("./bookings/bookings.module");
 const prisma_module_1 = require("./prisma/prisma.module");
 const organizations_module_1 = require("./organizations/organizations.module");
 const config_controller_1 = require("./config/config.controller");
+const unsplash_controller_1 = require("./unsplash/unsplash.controller");
+const unsplash_service_1 = require("./unsplash/unsplash.service");
 const organization_context_middleware_1 = require("./organizations/organization-context.middleware");
 const feature_flags_1 = require("./config/feature-flags");
 let AppModule = class AppModule {
@@ -43,8 +45,8 @@ exports.AppModule = AppModule = __decorate([
             properties_module_1.PropertiesModule,
             bookings_module_1.BookingsModule
         ],
-        controllers: [app_controller_1.AppController, config_controller_1.ConfigController],
-        providers: [app_service_1.AppService],
+        controllers: [app_controller_1.AppController, config_controller_1.ConfigController, unsplash_controller_1.UnsplashController],
+        providers: [app_service_1.AppService, unsplash_service_1.UnsplashService],
     })
 ], AppModule);
 //# sourceMappingURL=app.module.js.map

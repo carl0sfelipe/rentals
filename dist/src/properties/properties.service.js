@@ -15,14 +15,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.PropertiesService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../prisma/prisma.service");
-const organization_context_service_1 = require("../organizations/organization-context.service");
-const feature_flags_1 = require("../config/feature-flags");
+const unsplash_service_1 = require("../unsplash/unsplash.service");
 let PropertiesService = class PropertiesService {
-    constructor(prisma, organizationContext) {
+    constructor(prisma, unsplashService) {
         this.prisma = prisma;
-        this.organizationContext = organizationContext;
+        this.unsplashService = unsplashService;
     }
     async create(userId, data) {
+        const imageUrl = data.imageUrl || this.unsplashService.getRandomCuratedArchitectureImage();
         const propertyData = {
             title: data.title,
             description: data.description,
@@ -30,33 +30,15 @@ let PropertiesService = class PropertiesService {
             pricePerNight: data.pricePerNight || data.price || 0,
             bedrooms: data.bedrooms || 1,
             bathrooms: data.bathrooms || 1,
+            imageUrl: imageUrl,
             userId: userId
         };
-        if ((0, feature_flags_1.isTenantIsolationEnabled)()) {
-            const activeOrgId = this.organizationContext.getActiveOrganizationId();
-            console.log('🏢 PropertiesService.create - Organization context:', {
-                isTenantIsolationEnabled: (0, feature_flags_1.isTenantIsolationEnabled)(),
-                activeOrgId,
-                hasContext: this.organizationContext.hasContext(),
-                fullContext: this.organizationContext.getContext()
-            });
-            if (activeOrgId) {
-                propertyData.organizationId = activeOrgId;
-            }
-        }
         return this.prisma.property.create({
             data: propertyData
         });
     }
     async findAll(userId) {
-        const where = { userId };
-        if ((0, feature_flags_1.isTenantIsolationEnabled)()) {
-            const activeOrgId = this.organizationContext.getActiveOrganizationId();
-            if (activeOrgId) {
-                where.organizationId = activeOrgId;
-            }
-        }
-        return this.prisma.property.findMany({ where });
+        return this.prisma.property.findMany({ where: { userId } });
     }
     async findOne(userId, id) {
         const property = await this.prisma.property.findUnique({ where: { id } });
@@ -72,7 +54,11 @@ let PropertiesService = class PropertiesService {
             throw new common_1.NotFoundException('Property not found');
         if (property.userId !== userId)
             throw new common_1.ForbiddenException();
-        return this.prisma.property.update({ where: { id }, data });
+        const updateData = { ...data };
+        if (!updateData.imageUrl && !property.imageUrl) {
+            updateData.imageUrl = this.unsplashService.getRandomCuratedArchitectureImage();
+        }
+        return this.prisma.property.update({ where: { id }, data: updateData });
     }
     async remove(userId, id) {
         const property = await this.prisma.property.findUnique({ where: { id } });
@@ -139,6 +125,6 @@ exports.PropertiesService = PropertiesService = __decorate([
     (0, common_1.Injectable)(),
     __param(0, (0, common_1.Inject)(prisma_service_1.PrismaService)),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
-        organization_context_service_1.OrganizationContextService])
+        unsplash_service_1.UnsplashService])
 ], PropertiesService);
 //# sourceMappingURL=properties.service.js.map
