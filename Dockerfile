@@ -32,7 +32,7 @@ COPY src ./src
 RUN npm run build
 
 # Verificar se o build foi bem-sucedido
-RUN ls -la dist/ && test -f dist/src/main.js
+RUN ls -la dist/ && test -f dist/main.js
 
 # ------------------------------------------------------------
 # Stage production: imagem final enxuta
@@ -62,9 +62,9 @@ RUN if [ -f package-lock.json ]; then npm ci --omit=dev; else npm install --omit
 COPY --from=build --chown=node:node /usr/src/app/dist ./dist
 
 # Verificar se os arquivos foram copiados
-RUN ls -la dist/ && test -f dist/src/main.js
+RUN ls -la dist/ && test -f dist/main.js
 
 USER node
 EXPOSE 3000
 
-CMD ["node", "dist/src/main.js"]
+CMD ["node", "dist/main.js"]
