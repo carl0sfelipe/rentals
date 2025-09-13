@@ -52,22 +52,23 @@ FROM development AS build
 # Define variáveis que algumas libs usam para otimização
 ENV NODE_ENV=production
 # Executa build (requer script "build" configurado: nest build)
-RUN npm run build
+RUN npm run build && ls -la dist/
 
 # ------------------------------------------------------------
 # Stage production: imagem final enxuta
 # ------------------------------------------------------------
-FROM node:${NODE_VERSION} AS production
+FROM base AS production
 ENV NODE_ENV=production
-WORKDIR /usr/src/app
 
 # Copiar arquivos de manifesto e schema do Prisma primeiro
 COPY --chown=node:node package*.json ./
 COPY --chown=node:node prisma ./prisma
 
-# Instalar apenas dependências de produção e gerar Prisma client
+# Instalar dependências de produção + Prisma CLI temporariamente
 RUN if [ -f package-lock.json ]; then npm ci --omit=dev; else npm install --omit=dev; fi \
+  && npm install prisma --no-save \
   && npx prisma generate \
+  && npm uninstall prisma \
   && npm cache clean --force
 
 # Copiamos somente a pasta dist do stage build (código transpilado).
