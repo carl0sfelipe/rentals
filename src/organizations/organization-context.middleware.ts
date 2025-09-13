@@ -2,7 +2,7 @@ import { Injectable, NestMiddleware } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
 import { JwtService } from '@nestjs/jwt';
 import { OrganizationContextService } from './organization-context.service';
-import { isMultiTenantEnabled } from '../config/feature-flags';
+import { isOrganizationContextEnabled } from '../config/feature-flags';
 
 interface JwtPayload {
   sub: string;
@@ -18,8 +18,8 @@ export class OrganizationContextMiddleware implements NestMiddleware {
   ) {}
 
   async use(req: Request, res: Response, next: NextFunction) {
-    // Se multi-tenant está desabilitado, pular contexto organizacional
-    if (!isMultiTenantEnabled()) {
+    // Verificar se o sistema multi-tenant está habilitado
+    if (!isOrganizationContextEnabled()) {
       return next();
     }
 
@@ -46,12 +46,6 @@ export class OrganizationContextMiddleware implements NestMiddleware {
       // In production, you might want additional verification
       
       // Executar request dentro do contexto organizacional
-      console.log('🔑 Setting organization context:', {
-        organizationId: payload.activeOrganizationId,
-        userId: payload.sub,
-        role: 'ADMIN'
-      });
-      
       return this.organizationContext.run(
         {
           organizationId: payload.activeOrganizationId,

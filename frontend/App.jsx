@@ -1,6 +1,32 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
 
 // ============================================================================
+// FEATURE FLAGS (CONFIGURAÇÃO ÚNICA)
+// ============================================================================
+// Estado da configuração
+let MULTI_TENANT_ENABLED = false;
+let CONFIG_LOADED = false;
+
+// Função para carregar configuração do backend
+const loadConfig = async () => {
+  try {
+    const response = await fetch('http://localhost:3000/config/feature-flags');
+    if (response.ok) {
+      const config = await response.json();
+      MULTI_TENANT_ENABLED = config.MULTI_TENANT_ENABLED;
+      CONFIG_LOADED = true;
+      console.log('🚀 Configuração carregada:', { MULTI_TENANT_ENABLED });
+      return true;
+    }
+  } catch (error) {
+    console.warn('Erro ao carregar configuração, usando padrão');
+    MULTI_TENANT_ENABLED = false;
+    CONFIG_LOADED = true;
+  }
+  return false;
+};
+
+// ============================================================================
 // CONTEXTO DE AUTENTICAÇÃO
 // ============================================================================
 const AuthContext = createContext();
@@ -1568,7 +1594,26 @@ const DashboardPage = ({ user, activeOrganizationId, onLogout }) => {
   const [editingProperty, setEditingProperty] = useState(null);
   const [formLoading, setFormLoading] = useState(false);
   const [showMembersManagement, setShowMembersManagement] = useState(false);
+  const [multiTenantEnabled, setMultiTenantEnabled] = useState(false);
   const { token } = useAuth();
+
+  // Carrega configuração multi-tenant
+  useEffect(() => {
+    const loadConfig = async () => {
+      try {
+        const response = await fetch('http://localhost:3000/config/feature-flags');
+        if (response.ok) {
+          const config = await response.json();
+          setMultiTenantEnabled(config.MULTI_TENANT_ENABLED);
+          console.log('🚀 Multi-tenant configurado:', config.MULTI_TENANT_ENABLED);
+        }
+      } catch (error) {
+        console.warn('Erro ao carregar configuração multi-tenant');
+        setMultiTenantEnabled(false);
+      }
+    };
+    loadConfig();
+  }, []);
 
   // Carrega propriedades ao montar o componente
   useEffect(() => {
@@ -1671,12 +1716,14 @@ const DashboardPage = ({ user, activeOrganizationId, onLogout }) => {
               </div>
             </div>
             <div className="flex space-x-3">
-              <button
-                onClick={() => setShowMembersManagement(true)}
-                className="bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 px-4 rounded-md transition-colors"
-              >
-                👥 Membros
-              </button>
+              {multiTenantEnabled && (
+                <button
+                  onClick={() => setShowMembersManagement(true)}
+                  className="bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 px-4 rounded-md transition-colors"
+                >
+                  👥 Membros
+                </button>
+              )}
               <button
                 onClick={() => setShowPropertyForm(true)}
                 className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors"
@@ -1749,7 +1796,7 @@ const DashboardPage = ({ user, activeOrganizationId, onLogout }) => {
           )}
 
           {/* Gerenciamento de Membros (Modal) */}
-          {showMembersManagement && (
+          {multiTenantEnabled && showMembersManagement && (
             <MembersManagement onClose={() => setShowMembersManagement(false)} />
           )}
         </div>
@@ -1766,9 +1813,21 @@ const App = () => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
   const [page, setPage] = useState('login');
+  const [configLoaded, setConfigLoaded] = useState(false);
+
+  // Carrega configuração do backend
+  useEffect(() => {
+    const initializeConfig = async () => {
+      await loadConfig();
+      setConfigLoaded(true);
+    };
+    initializeConfig();
+  }, []);
 
   // Verifica se há token salvo no localStorage ao inicializar
   useEffect(() => {
+    if (!configLoaded) return; // Espera configuração carregar
+    
     const savedToken = localStorage.getItem('authToken');
     const savedUser = localStorage.getItem('authUser');
     
@@ -1787,7 +1846,7 @@ const App = () => {
     } else {
       setPage('login');
     }
-  }, []);
+  }, [configLoaded]);
 
   // Verifica periodicamente se o token ainda é válido (a cada 30 segundos)
   useEffect(() => {
@@ -1851,11 +1910,21 @@ const App = () => {
     <AuthContext.Provider value={authContextValue}>
       <div className="App">
         {/* Roteamento simples baseado em estado */}
-        {page === 'login' && (
+        {/* Loading state enquanto configuração carrega */}
+        {!configLoaded && (
+          <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <p className="text-gray-600">Carregando configuração...</p>
+            </div>
+          </div>
+        )}
+
+        {configLoaded && page === 'login' && (
           <LoginPage onLogin={handleLogin} />
         )}
         
-        {page === 'dashboard' && user && (
+        {configLoaded && page === 'dashboard' && user && (
           <DashboardPage user={user} onLogout={handleLogout} />
         )}
       </div>

@@ -18,12 +18,16 @@ const properties_module_1 = require("./properties/properties.module");
 const bookings_module_1 = require("./bookings/bookings.module");
 const prisma_module_1 = require("./prisma/prisma.module");
 const organizations_module_1 = require("./organizations/organizations.module");
+const config_controller_1 = require("./config/config.controller");
 const organization_context_middleware_1 = require("./organizations/organization-context.middleware");
+const feature_flags_1 = require("./config/feature-flags");
 let AppModule = class AppModule {
     configure(consumer) {
-        consumer
-            .apply(organization_context_middleware_1.OrganizationContextMiddleware)
-            .forRoutes('*');
+        if ((0, feature_flags_1.isOrganizationContextEnabled)()) {
+            consumer
+                .apply(organization_context_middleware_1.OrganizationContextMiddleware)
+                .forRoutes('*');
+        }
     }
 };
 exports.AppModule = AppModule;
@@ -32,14 +36,14 @@ exports.AppModule = AppModule = __decorate([
         imports: [
             schedule_1.ScheduleModule.forRoot(),
             prisma_module_1.PrismaModule,
-            organizations_module_1.OrganizationsModule,
+            ...((0, feature_flags_1.isMultiTenantEnabled)() ? [organizations_module_1.OrganizationsModule] : []),
             calendar_module_1.CalendarModule,
             auth_module_1.AuthModule,
             health_module_1.HealthModule,
             properties_module_1.PropertiesModule,
             bookings_module_1.BookingsModule
         ],
-        controllers: [app_controller_1.AppController],
+        controllers: [app_controller_1.AppController, config_controller_1.ConfigController],
         providers: [app_service_1.AppService],
     })
 ], AppModule);

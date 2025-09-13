@@ -1,11 +1,27 @@
 /**
  * Feature Flags Configuration
  * 
- * Este arquivo controla todas as funcionalidades avançadas do sistema.
- * Para ativar o sistema multi-tenant completo, simplesmente mude MULTI_TENANT_ENABLED para true.
+ * CONTROLE ÚNICO: Para ativar/desativar multi-tenant, edite APENAS o arquivo config.json na raiz do projeto!
  * 
- * ATENÇÃO: Após mudar qualquer flag, reinicie a aplicação para aplicar as mudanças.
+ * ATENÇÃO: Após mudar o config.json, reinicie a aplicação para aplicar as mudanças.
  */
+
+import * as fs from 'fs';
+import * as path from 'path';
+
+// Lê configuração do arquivo único
+function loadConfig() {
+  try {
+    const configPath = path.join(process.cwd(), 'config.json');
+    const configFile = fs.readFileSync(configPath, 'utf8');
+    return JSON.parse(configFile);
+  } catch (error) {
+    console.warn('Erro ao ler config.json, usando configuração padrão');
+    return { MULTI_TENANT_ENABLED: false };
+  }
+}
+
+const config = loadConfig();
 
 export interface FeatureFlags {
   // Flag principal que controla todo o sistema multi-tenant
@@ -22,13 +38,11 @@ export interface FeatureFlags {
   STRICT_TENANT_VALIDATION: boolean;
 }
 
-// CONFIGURAÇÃO PRINCIPAL
-// =====================
-// Para ativar TODO o sistema multi-tenant, mude esta linha para true:
-const MULTI_TENANT_ENABLED = true;
+// CONFIGURAÇÃO LIDA DO ARQUIVO ÚNICO config.json
+const MULTI_TENANT_ENABLED = config.MULTI_TENANT_ENABLED;
 
 // Configurações específicas (normalmente não precisam ser alteradas)
-const config: FeatureFlags = {
+const featureFlags: FeatureFlags = {
   MULTI_TENANT_ENABLED,
   
   // Auto-ativação baseada na flag principal
@@ -43,11 +57,11 @@ const config: FeatureFlags = {
 };
 
 // Funções helper para verificar features específicas
-export const isMultiTenantEnabled = (): boolean => config.MULTI_TENANT_ENABLED;
-export const isOrganizationManagementEnabled = (): boolean => config.ORGANIZATION_MANAGEMENT;
-export const isRoleBasedPermissionsEnabled = (): boolean => config.ROLE_BASED_PERMISSIONS;
-export const isTenantIsolationEnabled = (): boolean => config.TENANT_ISOLATION;
-export const isOrganizationContextEnabled = (): boolean => config.ORGANIZATION_CONTEXT;
+export const isMultiTenantEnabled = (): boolean => featureFlags.MULTI_TENANT_ENABLED;
+export const isOrganizationManagementEnabled = (): boolean => featureFlags.ORGANIZATION_MANAGEMENT;
+export const isRoleBasedPermissionsEnabled = (): boolean => featureFlags.ROLE_BASED_PERMISSIONS;
+export const isTenantIsolationEnabled = (): boolean => featureFlags.TENANT_ISOLATION;
+export const isOrganizationContextEnabled = (): boolean => featureFlags.ORGANIZATION_CONTEXT;
 export const isDebugOrganizationContext = (): boolean => config.DEBUG_ORGANIZATION_CONTEXT;
 export const isStrictTenantValidation = (): boolean => config.STRICT_TENANT_VALIDATION;
 

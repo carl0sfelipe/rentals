@@ -49,6 +49,7 @@ exports.AuthService = exports.PBKDF2Hasher = exports.LoginDto = exports.Register
 const common_1 = require("@nestjs/common");
 const jwt_1 = require("@nestjs/jwt");
 const prisma_service_1 = require("../prisma/prisma.service");
+const feature_flags_1 = require("../config/feature-flags");
 const crypto = __importStar(require("crypto"));
 class RegisterDto {
 }
@@ -83,36 +84,49 @@ let AuthService = class AuthService {
     async register(dto) {
         try {
             const hashed = await this.hasher.hash(dto.password);
-            const result = await this.prisma.$transaction(async (tx) => {
-                const user = await tx.user.create({
+            if ((0, feature_flags_1.isMultiTenantEnabled)()) {
+                const result = await this.prisma.$transaction(async (tx) => {
+                    const user = await tx.user.create({
+                        data: { email: dto.email, password: hashed, name: dto.name }
+                    });
+                    const organization = await tx.organization.create({
+                        data: {
+                            name: `${dto.name}'s Organization`,
+                            slug: `${dto.email.split('@')[0]}-${Date.now()}`,
+                        }
+                    });
+                    await tx.organizationUser.create({
+                        data: {
+                            userId: user.id,
+                            organizationId: organization.id,
+                            role: 'PROPRIETARIO'
+                        }
+                    });
+                    await tx.user.update({
+                        where: { id: user.id },
+                        data: { activeOrganizationId: organization.id }
+                    });
+                    return { user, organization };
+                });
+                return {
+                    access_token: await this.jwt.signAsync({
+                        sub: result.user.id,
+                        email: result.user.email,
+                        activeOrganizationId: result.organization.id
+                    })
+                };
+            }
+            else {
+                const user = await this.prisma.user.create({
                     data: { email: dto.email, password: hashed, name: dto.name }
                 });
-                const organization = await tx.organization.create({
-                    data: {
-                        name: `${dto.name}'s Organization`,
-                        slug: `${dto.email.split('@')[0]}-${Date.now()}`,
-                    }
-                });
-                await tx.organizationUser.create({
-                    data: {
-                        userId: user.id,
-                        organizationId: organization.id,
-                        role: 'PROPRIETARIO'
-                    }
-                });
-                await tx.user.update({
-                    where: { id: user.id },
-                    data: { activeOrganizationId: organization.id }
-                });
-                return { user, organization };
-            });
-            return {
-                access_token: await this.jwt.signAsync({
-                    sub: result.user.id,
-                    email: result.user.email,
-                    activeOrganizationId: result.organization.id
-                })
-            };
+                return {
+                    access_token: await this.jwt.signAsync({
+                        sub: user.id,
+                        email: user.email
+                    })
+                };
+            }
         }
         catch (err) {
             if (err?.code === 'P2002')
@@ -129,18 +143,28 @@ let AuthService = class AuthService {
         const valid = await this.hasher.compare(dto.password, user.password);
         if (!valid)
             throw new common_1.UnauthorizedException('Invalid credentials');
-        const userOrg = await this.prisma.organizationUser.findFirst({
-            where: { userId: user.id },
-            include: { organization: true }
-        });
-        const activeOrganizationId = userOrg?.organizationId || null;
-        return {
-            access_token: await this.jwt.signAsync({
-                sub: user.id,
-                email: user.email,
-                activeOrganizationId
-            })
-        };
+        if ((0, feature_flags_1.isMultiTenantEnabled)()) {
+            const userOrg = await this.prisma.organizationUser.findFirst({
+                where: { userId: user.id },
+                include: { organization: true }
+            });
+            const activeOrganizationId = userOrg?.organizationId || null;
+            return {
+                access_token: await this.jwt.signAsync({
+                    sub: user.id,
+                    email: user.email,
+                    activeOrganizationId
+                })
+            };
+        }
+        else {
+            return {
+                access_token: await this.jwt.signAsync({
+                    sub: user.id,
+                    email: user.email
+                })
+            };
+        }
     }
 };
 exports.AuthService = AuthService;

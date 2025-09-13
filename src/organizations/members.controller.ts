@@ -8,10 +8,12 @@ import {
   Param,
   UseGuards,
   Request,
+  NotFoundException,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { OrganizationMembersService, AddMemberDto } from './invites.service';
 import { OrganizationRole } from '@prisma/client';
+import { isMultiTenantEnabled } from '../config/feature-flags';
 
 interface AuthenticatedRequest {
   user: {
@@ -32,6 +34,9 @@ export class OrganizationMembersController {
    */
   @Get()
   async getMembers() {
+    if (!isMultiTenantEnabled()) {
+      throw new NotFoundException('Multi-tenant feature is disabled');
+    }
     return this.membersService.getMembers();
   }
 
@@ -40,6 +45,9 @@ export class OrganizationMembersController {
    */
   @Post()
   async addMember(@Body() addMemberDto: AddMemberDto, @Request() req: AuthenticatedRequest) {
+    if (!isMultiTenantEnabled()) {
+      throw new NotFoundException('Multi-tenant feature is disabled');
+    }
     return this.membersService.addMember(addMemberDto, req.user.id);
   }
 
@@ -48,6 +56,9 @@ export class OrganizationMembersController {
    */
   @Delete(':userId')
   async removeMember(@Param('userId') userId: string, @Request() req: AuthenticatedRequest) {
+    if (!isMultiTenantEnabled()) {
+      throw new NotFoundException('Multi-tenant feature is disabled');
+    }
     return this.membersService.removeMember(userId, req.user.id);
   }
 
@@ -60,6 +71,9 @@ export class OrganizationMembersController {
     @Body('role') role: OrganizationRole,
     @Request() req: AuthenticatedRequest,
   ) {
+    if (!isMultiTenantEnabled()) {
+      throw new NotFoundException('Multi-tenant feature is disabled');
+    }
     return this.membersService.updateMemberRole(userId, role, req.user.id);
   }
 
@@ -68,6 +82,9 @@ export class OrganizationMembersController {
    */
   @Get('/my-organizations')
   async getMyOrganizations(@Request() req: AuthenticatedRequest) {
+    if (!isMultiTenantEnabled()) {
+      throw new NotFoundException('Multi-tenant feature is disabled');
+    }
     return this.membersService.getUserOrganizations(req.user.id);
   }
 
@@ -79,6 +96,9 @@ export class OrganizationMembersController {
     @Param('organizationId') organizationId: string,
     @Request() req: AuthenticatedRequest,
   ) {
+    if (!isMultiTenantEnabled()) {
+      throw new NotFoundException('Multi-tenant feature is disabled');
+    }
     return this.membersService.switchOrganization(req.user.id, organizationId);
   }
 }
