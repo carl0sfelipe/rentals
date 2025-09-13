@@ -1,0 +1,106 @@
+import { Injectable, CanActivate, ExecutionContext, ForbiddenException, UnauthorizedException } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
+import { OrganizationContextService } from './organization-context.service';
+import { OrganizationsService } from './organizations.service';
+
+/**
+ * Guard que verifica:
+ * 1. JWT válido (já validado pelo JwtAuthGuard)
+ * 2. Usuário pertence à activeOrganizationId via OrganizationUser
+ * 3. Se o endpoint exige um recurso (ex: :propertyId), verificar se pertence à mesma org
+ */
+@Injectable()
+export class TenantResourceGuard implements CanActivate {
+  constructor(
+    private reflector: Reflector,
+    private organizationContext: OrganizationContextService,
+    private organizationsService: OrganizationsService,
+  ) {}
+
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const request = context.switchToHttp().getRequest();
+    const user = request.user;
+
+    // Se não há usuário autenticado, negar acesso
+    if (!user?.sub) {
+      throw new UnauthorizedException('User not authenticated');
+    }
+
+    // Se não há contexto organizacional, permitir (usuário não tem org ativa)
+    const orgContext = this.organizationContext.getContext();
+    if (!orgContext) {
+      return true;
+    }
+
+    // Verificar se usuário ainda pertence à organização
+    const belongsToOrg = await this.organizationsService.userBelongsToOrganization(
+      user.sub,
+      orgContext.organizationId
+    );
+
+    if (!belongsToOrg) {
+      throw new ForbiddenException('User does not belong to the active organization');
+    }
+
+    // Verificar recursos específicos do endpoint
+    await this.checkResourceAccess(request, orgContext.organizationId);
+
+    return true;
+  }
+
+  private async checkResourceAccess(request: any, organizationId: string): Promise<void> {
+    const { params } = request;
+
+    // Verificar se propriedade pertence à organização
+    if (params.propertyId) {
+      await this.verifyPropertyAccess(params.propertyId, organizationId);
+    }
+
+    // Verificar se booking pertence à organização (via propriedade)
+    if (params.bookingId) {
+      await this.verifyBookingAccess(params.bookingId, organizationId);
+    }
+  }
+
+  private async verifyPropertyAccess(propertyId: string, organizationId: string): Promise<void> {
+    const { PrismaClient } = await import('@prisma/client');
+    const prisma = new PrismaClient();
+
+    try {
+      const property = await prisma.property.findFirst({
+        where: {
+          id: propertyId,
+          organizationId: organizationId,
+        },
+        select: { id: true },
+      });
+
+      if (!property) {
+        throw new ForbiddenException('Property not found or access denied');
+      }
+    } finally {
+      await prisma.$disconnect();
+    }
+  }
+
+  private async verifyBookingAccess(bookingId: string, organizationId: string): Promise<void> {
+    const { PrismaClient } = await import('@prisma/client');
+    const prisma = new PrismaClient();
+
+    try {
+      const booking = await prisma.booking.findFirst({
+        where: {
+          id: bookingId,
+          organizationId: organizationId,
+        },
+        select: { id: true },
+      });
+
+      if (!booking) {
+        throw new ForbiddenException('Booking not found or access denied');
+      }
+    } finally {
+      await prisma.$disconnect();
+    }
+  }
+}

@@ -1,6 +1,7 @@
 import { ConflictException, Injectable, UnauthorizedException, Inject } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
+import { OrganizationRole } from '@prisma/client';
 import * as crypto from 'crypto';
 
 export class RegisterDto { email!: string; password!: string; name!: string; }
@@ -31,22 +32,55 @@ export class PBKDF2Hasher implements PasswordHasher {
 @Injectable()
 export class AuthService {
   constructor(
-    @Inject(PrismaService) private readonly prisma: PrismaService,
-    @Inject(JwtService) private readonly jwt: JwtService,
-    @Inject('PasswordHasher') private readonly hasher: PasswordHasher,
+    private prisma: PrismaService,
+    private jwt: JwtService,
+    @Inject('PasswordHasher') private hasher: PasswordHasher,
   ) {}
 
   async register(dto: RegisterDto) {
-    const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
-    if (existing) throw new ConflictException('Email already in use');
-
-    const hashed = await this.hasher.hash(dto.password);
     try {
-      // Retorna apenas campos seguros
-      return await this.prisma.user.create({
-        data: { email: dto.email, password: hashed, name: dto.name },
-        select: { id: true, email: true, name: true },
+      const hashed = await this.hasher.hash(dto.password);
+      
+      // Create user and organization in a transaction
+      const result = await this.prisma.$transaction(async (tx) => {
+        // Create the user
+        const user = await tx.user.create({
+          data: { email: dto.email, password: hashed, name: dto.name }
+        });
+
+        // Create organization for the user (Org-Lite: each user gets their own org)
+        const organization = await tx.organization.create({
+          data: {
+            name: `${dto.name}'s Organization`,
+            slug: `${dto.email.split('@')[0]}-${Date.now()}`, // Simple slug generation
+          }
+        });
+
+        // Add user as ADMIN of their organization
+        await tx.organizationUser.create({
+          data: {
+            userId: user.id,
+            organizationId: organization.id,
+            role: OrganizationRole.ADMIN
+          }
+        });
+
+        // Update user's activeOrganizationId
+        await tx.user.update({
+          where: { id: user.id },
+          data: { activeOrganizationId: organization.id }
+        });
+
+        return { user, organization };
       });
+
+      return { 
+        access_token: await this.jwt.signAsync({ 
+          sub: result.user.id, 
+          email: result.user.email,
+          activeOrganizationId: result.organization.id
+        }) 
+      };
     } catch (err: any) {
       // Prisma unique constraint (race condition)
       if (err?.code === 'P2002') throw new ConflictException('Email already in use');
@@ -55,10 +89,28 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
-    const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
+    const user = await this.prisma.user.findUnique({ 
+      where: { email: dto.email }
+    });
     if (!user) throw new UnauthorizedException('Invalid credentials');
+    
     const valid = await this.hasher.compare(dto.password, user.password);
     if (!valid) throw new UnauthorizedException('Invalid credentials');
-    return { access_token: await this.jwt.signAsync({ sub: user.id, email: user.email }) };
+    
+    // Get user's primary organization
+    const userOrg = await this.prisma.organizationUser.findFirst({
+      where: { userId: user.id },
+      include: { organization: true }
+    });
+    
+    const activeOrganizationId = userOrg?.organizationId || null;
+
+    return { 
+      access_token: await this.jwt.signAsync({ 
+        sub: user.id, 
+        email: user.email,
+        activeOrganizationId
+      }) 
+    };
   }
 }

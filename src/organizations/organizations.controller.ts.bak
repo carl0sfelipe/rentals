@@ -1,0 +1,22 @@
+import { Controller, Get, Post, Body, Param, UseGuards, Request } from '@nestjs/common';
+import { OrganizationsService } from './organizations.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+
+@Controller('organizations')
+@UseGuards(JwtAuthGuard)
+export class OrganizationsController {
+  constructor(private readonly organizationsService: OrganizationsService) {}
+
+  @Get()
+  async getUserOrganizations(@Request() req: any) {
+    return this.organizationsService.getUserOrganizations(req.user.sub);
+  }
+
+  @Post(':organizationId/switch')
+  async switchActiveOrganization(
+    @Param('organizationId') organizationId: string,
+    @Request() req: any
+  ) {
+    return this.organizationsService.switchActiveOrganization(req.user.sub, organizationId);
+  }
+}
