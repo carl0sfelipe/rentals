@@ -10,7 +10,8 @@ let CONFIG_LOADED = false;
 // Função para carregar configuração do backend
 const loadConfig = async () => {
   try {
-    const response = await fetch('http://localhost:3000/config/feature-flags');
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    const response = await fetch(`${apiUrl}/config/feature-flags`);
     if (response.ok) {
       const config = await response.json();
       MULTI_TENANT_ENABLED = config.MULTI_TENANT_ENABLED;
@@ -43,7 +44,7 @@ const useAuth = () => {
 // ============================================================================
 // UTILITÁRIOS E CONFIGURAÇÕES
 // ============================================================================
-const API_BASE_URL = 'http://localhost:3000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 // ============================================================================
 // FUNÇÕES DE API (CONECTADAS AO BACKEND REAL)
