@@ -91,21 +91,29 @@ let CalendarSyncService = CalendarSyncService_1 = class CalendarSyncService {
         return { processed };
     }
     async scheduledSync() {
-        if (!this.prisma?.property?.findMany)
-            return;
-        try {
-            this.logger.log('Iniciando sync periódico de calendários');
-            const props = await this.prisma.property.findMany({
-                where: { calendarUrl: { not: null } },
-                select: { id: true, calendarUrl: true },
-            });
-            for (const p of props) {
-                await this.syncForProperty({ propertyId: p.id, url: p.calendarUrl });
+        if (this.prisma.property?.findMany) {
+            try {
+                const properties = await this.prisma.property.findMany({
+                    where: { calendarUrl: { not: null } },
+                    select: { id: true, calendarUrl: true },
+                });
+                for (const prop of properties) {
+                    if (prop.calendarUrl) {
+                        await this.syncForProperty({
+                            propertyId: prop.id,
+                            url: prop.calendarUrl,
+                            horizonDays: 365,
+                        });
+                    }
+                }
+                this.logger.log(`Sincronização automática concluída para ${properties.length} propriedades`);
             }
-            this.logger.log(`Sync concluído para ${props.length} propriedades`);
+            catch (error) {
+                this.logger.log('Auto-sync não disponível - campo calendarUrl não existe no schema');
+            }
         }
-        catch (e) {
-            this.logger.error('Erro no sync periódico', e?.message);
+        else {
+            this.logger.log('Auto-sync não disponível - campo calendarUrl não existe no schema');
         }
     }
 };

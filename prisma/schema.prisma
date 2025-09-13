@@ -117,10 +117,11 @@ model Booking {
 // === ENUMS ===
 
 enum OrganizationRole {
-  ADMIN   // Full access: ['*']
-  MANAGER // Property management: ['property:*', 'booking:*', 'calendar:*']
-  MEMBER  // Read-only: ['property:read', 'booking:read', 'calendar:read']
-  CLEANER // Cleaning tasks: ['cleaning:read', 'cleaning:updateSelf']
+  PROPRIETARIO // Owner: Full ownership access, can transfer ownership: ['*', 'ownership:*']
+  ADMIN        // Full access: ['*']
+  MANAGER      // Property management: ['property:*', 'booking:*', 'calendar:*']
+  MEMBER       // Read-only: ['property:read', 'booking:read', 'calendar:read']
+  CLEANER      // Cleaning tasks: ['cleaning:read', 'cleaning:updateSelf']
 }
 
 enum BookingType {

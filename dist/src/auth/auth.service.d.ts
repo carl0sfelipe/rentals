@@ -1,6 +1,9 @@
+import { JwtService } from '@nestjs/jwt';
+import { PrismaService } from '../prisma/prisma.service';
 export declare class RegisterDto {
     email: string;
     password: string;
+    name: string;
 }
 export declare class LoginDto {
     email: string;
@@ -15,12 +18,14 @@ export declare class PBKDF2Hasher implements PasswordHasher {
     compare(plain: string, stored: string): Promise<boolean>;
 }
 export declare class AuthService {
-    private readonly prisma;
-    private readonly jwt;
-    private readonly hasher;
-    constructor(prisma: any, jwt: any, hasher: PasswordHasher);
-    register(dto: RegisterDto): Promise<any>;
+    private prisma;
+    private jwt;
+    private hasher;
+    constructor(prisma: PrismaService, jwt: JwtService, hasher: PasswordHasher);
+    register(dto: RegisterDto): Promise<{
+        access_token: string;
+    }>;
     login(dto: LoginDto): Promise<{
-        access_token: any;
+        access_token: string;
     }>;
 }

@@ -53,9 +53,8 @@ model User {
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
-  // Relações
+  // Relações (não tenant-scoped)
   organizations OrganizationUser[]
-  properties    Property[] // Legacy - mantido durante transição
 
   @@index([activeOrganizationId])
   @@map("users")
@@ -74,15 +73,14 @@ model Property {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  // Tenant Context (nullable durante migração)
-  organizationId String? @db.Uuid
+  // Tenant Context
+  organizationId String @db.Uuid
 
-  // Foreign Keys (legacy - mantido durante transição)
-  userId String @db.Uuid
+  // Foreign Keys (legacy - será removido em migration futura)
+  userId String? @db.Uuid
 
   // Relações
-  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user         User          @relation(fields: [userId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   bookings     Booking[]
 
   @@index([organizationId])
@@ -98,15 +96,15 @@ model Booking {
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
 
-  // Tenant Context (nullable durante migração)
-  organizationId String? @db.Uuid
+  // Tenant Context
+  organizationId String @db.Uuid
 
   // Foreign Keys
   propertyId String @db.Uuid
 
   // Relações
-  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  property     Property      @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  property     Property     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
   @@index([organizationId, createdAt])
@@ -117,7 +115,6 @@ model Booking {
 // === ENUMS ===
 
 enum OrganizationRole {
-  PROPRIETARIO // Owner: Full ownership access, can transfer ownership: ['*', 'ownership:*']
   ADMIN // Full access: ['*']
   MANAGER // Property management: ['property:*', 'booking:*', 'calendar:*']
   MEMBER // Read-only: ['property:read', 'booking:read', 'calendar:read']

@@ -10,22 +10,27 @@ exports.AuthModule = void 0;
 const common_1 = require("@nestjs/common");
 const auth_service_1 = require("./auth.service");
 const auth_controller_1 = require("./auth.controller");
-const prisma_service_1 = require("../prisma/prisma.service");
+const jwt_1 = require("@nestjs/jwt");
+const prisma_module_1 = require("../prisma/prisma.module");
 let AuthModule = class AuthModule {
 };
 exports.AuthModule = AuthModule;
 exports.AuthModule = AuthModule = __decorate([
     (0, common_1.Module)({
+        imports: [
+            prisma_module_1.PrismaModule,
+            jwt_1.JwtModule.register({
+                secret: process.env.JWT_SECRET || 'your-secret-key',
+                signOptions: { expiresIn: '1h' },
+            }),
+        ],
         controllers: [auth_controller_1.AuthController],
         providers: [
-            prisma_service_1.PrismaService,
-            { provide: 'PrismaService', useExisting: prisma_service_1.PrismaService },
             auth_service_1.AuthService,
             auth_service_1.PBKDF2Hasher,
             { provide: 'PasswordHasher', useExisting: auth_service_1.PBKDF2Hasher },
-            { provide: 'JwtService', useValue: { signAsync: async (payload) => `signed-jwt-token` } },
         ],
-        exports: [auth_service_1.AuthService],
+        exports: [auth_service_1.AuthService, jwt_1.JwtModule],
     })
 ], AuthModule);
 //# sourceMappingURL=auth.module.js.map

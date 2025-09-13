@@ -47,6 +47,8 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuthService = exports.PBKDF2Hasher = exports.LoginDto = exports.RegisterDto = void 0;
 const common_1 = require("@nestjs/common");
+const jwt_1 = require("@nestjs/jwt");
+const prisma_service_1 = require("../prisma/prisma.service");
 const crypto = __importStar(require("crypto"));
 class RegisterDto {
 }
@@ -79,15 +81,38 @@ let AuthService = class AuthService {
         this.hasher = hasher;
     }
     async register(dto) {
-        const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
-        if (existing)
-            throw new common_1.ConflictException('Email already in use');
-        const hashed = await this.hasher.hash(dto.password);
         try {
-            return await this.prisma.user.create({
-                data: { email: dto.email, password: hashed },
-                select: { id: true, email: true },
+            const hashed = await this.hasher.hash(dto.password);
+            const result = await this.prisma.$transaction(async (tx) => {
+                const user = await tx.user.create({
+                    data: { email: dto.email, password: hashed, name: dto.name }
+                });
+                const organization = await tx.organization.create({
+                    data: {
+                        name: `${dto.name}'s Organization`,
+                        slug: `${dto.email.split('@')[0]}-${Date.now()}`,
+                    }
+                });
+                await tx.organizationUser.create({
+                    data: {
+                        userId: user.id,
+                        organizationId: organization.id,
+                        role: 'PROPRIETARIO'
+                    }
+                });
+                await tx.user.update({
+                    where: { id: user.id },
+                    data: { activeOrganizationId: organization.id }
+                });
+                return { user, organization };
             });
+            return {
+                access_token: await this.jwt.signAsync({
+                    sub: result.user.id,
+                    email: result.user.email,
+                    activeOrganizationId: result.organization.id
+                })
+            };
         }
         catch (err) {
             if (err?.code === 'P2002')
@@ -96,21 +121,33 @@ let AuthService = class AuthService {
         }
     }
     async login(dto) {
-        const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
+        const user = await this.prisma.user.findUnique({
+            where: { email: dto.email }
+        });
         if (!user)
             throw new common_1.UnauthorizedException('Invalid credentials');
         const valid = await this.hasher.compare(dto.password, user.password);
         if (!valid)
             throw new common_1.UnauthorizedException('Invalid credentials');
-        return { access_token: await this.jwt.signAsync({ sub: user.id, email: user.email }) };
+        const userOrg = await this.prisma.organizationUser.findFirst({
+            where: { userId: user.id },
+            include: { organization: true }
+        });
+        const activeOrganizationId = userOrg?.organizationId || null;
+        return {
+            access_token: await this.jwt.signAsync({
+                sub: user.id,
+                email: user.email,
+                activeOrganizationId
+            })
+        };
     }
 };
 exports.AuthService = AuthService;
 exports.AuthService = AuthService = __decorate([
     (0, common_1.Injectable)(),
-    __param(0, (0, common_1.Inject)('PrismaService')),
-    __param(1, (0, common_1.Inject)('JwtService')),
     __param(2, (0, common_1.Inject)('PasswordHasher')),
-    __metadata("design:paramtypes", [Object, Object, Object])
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService,
+        jwt_1.JwtService, Object])
 ], AuthService);
 //# sourceMappingURL=auth.service.js.map

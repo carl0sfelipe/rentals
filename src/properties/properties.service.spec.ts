@@ -63,7 +63,12 @@ describe('PropertiesService (unit)', () => {
   beforeEach(() => {
     properties.length = 0;
     vi.clearAllMocks();
-    service = new PropertiesService(prismaMock as any);
+    // Mock OrganizationContextService
+    const mockOrgContext = {
+      getActiveOrganizationId: vi.fn().mockReturnValue(null),
+      setActiveOrganizationId: vi.fn(),
+    };
+    service = new PropertiesService(prismaMock as any, mockOrgContext as any);
   });
 
   describe('create', () => {
@@ -129,7 +134,7 @@ describe('PropertiesService (unit)', () => {
 
       expect(propsA).toHaveLength(2);
       expect(propsB).toHaveLength(1);
-      expect(propsA.map(p => p.title)).toEqual(['Casa A1', 'Casa A2']);
+      expect(propsA.map((p: any) => p.title)).toEqual(['Casa A1', 'Casa A2']);
     });
   });
 });

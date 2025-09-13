@@ -56,12 +56,12 @@ export class AuthService {
           }
         });
 
-        // Add user as ADMIN of their organization
+        // Add user as PROPRIETARIO of their organization (owner of their own org)
         await tx.organizationUser.create({
           data: {
             userId: user.id,
             organizationId: organization.id,
-            role: OrganizationRole.ADMIN
+            role: 'PROPRIETARIO' as OrganizationRole
           }
         });
 

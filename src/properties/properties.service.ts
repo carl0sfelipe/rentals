@@ -1,5 +1,7 @@
 import { ForbiddenException, Injectable, NotFoundException, Inject } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { OrganizationContextService } from '../organizations/organization-context.service';
+import { isTenantIsolationEnabled } from '../config/feature-flags';
 
 interface PropertyDto { 
   title: string; 
@@ -23,7 +25,10 @@ interface UpdatePropertyDto {
 
 @Injectable()
 export class PropertiesService {
-  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    private readonly organizationContext: OrganizationContextService
+  ) {}
 
   async create(userId: string, data: PropertyDto) {
     const propertyData = {
@@ -35,6 +40,21 @@ export class PropertiesService {
       bathrooms: data.bathrooms || 1,
       userId: userId
     };
+
+    // Adicionar organizationId se multi-tenant estiver habilitado
+    if (isTenantIsolationEnabled()) {
+      const activeOrgId = this.organizationContext.getActiveOrganizationId();
+      console.log('🏢 PropertiesService.create - Organization context:', {
+        isTenantIsolationEnabled: isTenantIsolationEnabled(),
+        activeOrgId,
+        hasContext: this.organizationContext.hasContext(),
+        fullContext: this.organizationContext.getContext()
+      });
+      
+      if (activeOrgId) {
+        (propertyData as any).organizationId = activeOrgId;
+      }
+    }
     
     return this.prisma.property.create({ 
       data: propertyData
@@ -42,7 +62,17 @@ export class PropertiesService {
   }
 
   async findAll(userId: string) {
-    return this.prisma.property.findMany({ where: { userId } });
+    const where: any = { userId };
+    
+    // Adicionar filtro de organizationId se multi-tenant estiver habilitado
+    if (isTenantIsolationEnabled()) {
+      const activeOrgId = this.organizationContext.getActiveOrganizationId();
+      if (activeOrgId) {
+        where.organizationId = activeOrgId;
+      }
+    }
+    
+    return this.prisma.property.findMany({ where });
   }
 
   async findOne(userId: string, id: string) {

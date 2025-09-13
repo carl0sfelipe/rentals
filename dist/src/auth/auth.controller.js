@@ -12,23 +12,31 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.AuthController = void 0;
+exports.AuthController = exports.LoginRequestDto = exports.RegisterRequestDto = void 0;
 const common_1 = require("@nestjs/common");
 const auth_service_1 = require("./auth.service");
 const class_validator_1 = require("class-validator");
+const class_transformer_1 = require("class-transformer");
 class RegisterRequestDto {
 }
+exports.RegisterRequestDto = RegisterRequestDto;
 __decorate([
     (0, class_validator_1.IsEmail)(),
     __metadata("design:type", String)
 ], RegisterRequestDto.prototype, "email", void 0);
 __decorate([
     (0, class_validator_1.IsString)(),
-    (0, class_validator_1.MinLength)(6),
+    (0, class_validator_1.MinLength)(8),
     __metadata("design:type", String)
 ], RegisterRequestDto.prototype, "password", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.MinLength)(2),
+    __metadata("design:type", String)
+], RegisterRequestDto.prototype, "name", void 0);
 class LoginRequestDto {
 }
+exports.LoginRequestDto = LoginRequestDto;
 __decorate([
     (0, class_validator_1.IsEmail)(),
     __metadata("design:type", String)
@@ -38,14 +46,19 @@ __decorate([
     __metadata("design:type", String)
 ], LoginRequestDto.prototype, "password", void 0);
 let AuthController = class AuthController {
-    constructor(auth) {
-        this.auth = auth;
+    constructor(authService) {
+        this.authService = authService;
     }
-    async register(dto) {
-        return this.auth.register(dto);
+    async register(body) {
+        const dto = (0, class_transformer_1.plainToClass)(RegisterRequestDto, body);
+        const errors = await (0, class_validator_1.validate)(dto);
+        if (errors.length > 0) {
+            throw new common_1.BadRequestException('Validation failed');
+        }
+        return this.authService.register(dto);
     }
     async login(dto) {
-        return this.auth.login(dto);
+        return this.authService.login(dto);
     }
 };
 exports.AuthController = AuthController;
@@ -53,7 +66,7 @@ __decorate([
     (0, common_1.Post)('register'),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [RegisterRequestDto]),
+    __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", Promise)
 ], AuthController.prototype, "register", null);
 __decorate([
@@ -66,6 +79,7 @@ __decorate([
 ], AuthController.prototype, "login", null);
 exports.AuthController = AuthController = __decorate([
     (0, common_1.Controller)('auth'),
+    __param(0, (0, common_1.Inject)(auth_service_1.AuthService)),
     __metadata("design:paramtypes", [auth_service_1.AuthService])
 ], AuthController);
 //# sourceMappingURL=auth.controller.js.map

@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { OrganizationContextService } from './organization-context.service';
 import { OrganizationContextMiddleware } from './organization-context.middleware';
+import { OrganizationMembersService } from './invites.service';
+import { OrganizationMembersController } from './members.controller';
 import { PrismaModule } from '../prisma/prisma.module';
 import { JwtModule } from '@nestjs/jwt';
 
@@ -12,13 +14,16 @@ import { JwtModule } from '@nestjs/jwt';
       signOptions: { expiresIn: '24h' },
     }),
   ],
+  controllers: [OrganizationMembersController],
   providers: [
     OrganizationContextService,
     OrganizationContextMiddleware,
+    OrganizationMembersService,
   ],
   exports: [
     OrganizationContextService,
     OrganizationContextMiddleware,
+    OrganizationMembersService,
   ],
 })
 export class OrganizationsModule {}

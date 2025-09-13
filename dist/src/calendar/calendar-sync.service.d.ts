@@ -29,7 +29,7 @@ interface PrismaLike {
     property?: {
         findMany(args: any): Promise<Array<{
             id: string;
-            calendarUrl: string;
+            calendarUrl?: string;
         }>>;
     };
 }
