@@ -1,4 +1,5 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
+import ProfessionalAd from './src/components/ProfessionalAd';
 
 // ============================================================================
 // FEATURE FLAGS (CONFIGURAÇÃO ÚNICA)
@@ -1144,7 +1145,7 @@ const LoginPage = ({ onLogin }) => {
 // ============================================================================
 // COMPONENTE: CARTÃO DE PROPRIEDADE
 // ============================================================================
-const PropertyCard = ({ property, onCreateBooking, onEdit, onDelete, showActions = false }) => {
+const PropertyCard = ({ property, onCreateBooking, onEdit, onDelete, onViewProfessionalAd, showActions = false }) => {
   const [showBookingForm, setShowBookingForm] = useState(false);
   const [showBookingsList, setShowBookingsList] = useState(false);
   const [bookingData, setBookingData] = useState({
@@ -1248,6 +1249,15 @@ const PropertyCard = ({ property, onCreateBooking, onEdit, onDelete, showActions
               </button>
             </>
           )}
+        </div>
+
+        <div className="flex space-x-2 mb-3">
+          <button
+            onClick={() => onViewProfessionalAd(property)}
+            className="flex-1 bg-purple-600 text-white py-2 px-4 rounded-md hover:bg-purple-700 transition-colors text-sm font-medium"
+          >
+            📄 Ver Anúncio Profissional
+          </button>
         </div>
 
         <div className="flex space-x-2">
@@ -1667,6 +1677,8 @@ const DashboardPage = ({ user, activeOrganizationId, onLogout }) => {
   const [editingProperty, setEditingProperty] = useState(null);
   const [formLoading, setFormLoading] = useState(false);
   const [showMembersManagement, setShowMembersManagement] = useState(false);
+  const [showProfessionalAd, setShowProfessionalAd] = useState(false);
+  const [selectedProperty, setSelectedProperty] = useState(null);
   const [multiTenantEnabled, setMultiTenantEnabled] = useState(false);
   const { token } = useAuth();
 
@@ -1772,6 +1784,12 @@ const DashboardPage = ({ user, activeOrganizationId, onLogout }) => {
     setEditingProperty(null);
   };
 
+  // Handle ver anúncio profissional
+  const handleViewProfessionalAd = (property) => {
+    setSelectedProperty(property);
+    setShowProfessionalAd(true);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -1837,6 +1855,7 @@ const DashboardPage = ({ user, activeOrganizationId, onLogout }) => {
                     onCreateBooking={handleCreateBooking}
                     onEdit={handleEditProperty}
                     onDelete={handleDeleteProperty}
+                    onViewProfessionalAd={handleViewProfessionalAd}
                     showActions={true}
                   />
                 ))
@@ -1871,6 +1890,17 @@ const DashboardPage = ({ user, activeOrganizationId, onLogout }) => {
           {/* Gerenciamento de Membros (Modal) */}
           {multiTenantEnabled && showMembersManagement && (
             <MembersManagement onClose={() => setShowMembersManagement(false)} />
+          )}
+
+          {/* Professional Ad Modal */}
+          {showProfessionalAd && selectedProperty && (
+            <ProfessionalAd
+              property={selectedProperty}
+              onClose={() => {
+                setShowProfessionalAd(false);
+                setSelectedProperty(null);
+              }}
+            />
           )}
         </div>
       </main>
