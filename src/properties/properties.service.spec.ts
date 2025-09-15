@@ -63,7 +63,11 @@ describe('PropertiesService (unit)', () => {
   beforeEach(() => {
     properties.length = 0;
     vi.clearAllMocks();
-    service = new PropertiesService(prismaMock as any);
+    // Mock UnsplashService
+    const mockUnsplashService = {
+      getRandomCuratedArchitectureImage: vi.fn().mockReturnValue('https://example.com/image.jpg'),
+    };
+    service = new PropertiesService(prismaMock as any, mockUnsplashService as any);
   });
 
   describe('create', () => {
@@ -129,7 +133,7 @@ describe('PropertiesService (unit)', () => {
 
       expect(propsA).toHaveLength(2);
       expect(propsB).toHaveLength(1);
-      expect(propsA.map(p => p.title)).toEqual(['Casa A1', 'Casa A2']);
+      expect(propsA.map((p: any) => p.title)).toEqual(['Casa A1', 'Casa A2']);
     });
   });
 });

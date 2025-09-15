@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -8,10 +8,33 @@ import { HealthModule } from './health/health.module';
 import { PropertiesModule } from './properties/properties.module';
 import { BookingsModule } from './bookings/bookings.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { OrganizationsModule } from './organizations/organizations.module';
+import { ConfigController } from './config/config.controller';
+import { UnsplashController } from './unsplash/unsplash.controller';
+import { UnsplashService } from './unsplash/unsplash.service';
+import { OrganizationContextMiddleware } from './organizations/organization-context.middleware';
+import { isMultiTenantEnabled, isOrganizationContextEnabled } from './config/feature-flags';
 
 @Module({
-  imports: [ScheduleModule.forRoot(), PrismaModule, CalendarModule, AuthModule, HealthModule, PropertiesModule, BookingsModule],
-  controllers: [AppController],
-  providers: [AppService],
+  imports: [
+    ScheduleModule.forRoot(), 
+    PrismaModule, 
+    ...(isMultiTenantEnabled() ? [OrganizationsModule] : []),
+    CalendarModule, 
+    AuthModule, 
+    HealthModule, 
+    PropertiesModule, 
+    BookingsModule
+  ],
+  controllers: [AppController, ConfigController, UnsplashController],
+  providers: [AppService, UnsplashService],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    if (isOrganizationContextEnabled()) {
+      consumer
+        .apply(OrganizationContextMiddleware)
+        .forRoutes('*'); // Apply to all routes only if multi-tenant is enabled
+    }
+  }
+}

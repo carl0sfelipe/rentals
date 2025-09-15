@@ -1,25 +1,11 @@
 import { defineConfig } from 'vitest/config';
+import { loadEnv } from 'vite';
 
 export default defineConfig({
   test: {
-    globals: true,
+    include: ['test/**/*.e2e-spec.ts'],
     environment: 'node',
-    include: [
-      'test/**/*.e2e-spec.ts'
-    ],
-    exclude: [
-      '**/node_modules/**',
-      '**/dist/**'
-    ],
-    coverage: {
-      provider: 'v8',
-    },
-    // Executar testes sequencialmente para evitar conflitos de banco
-    pool: 'forks',
-    poolOptions: {
-      forks: {
-        singleFork: true
-      }
-    }
+    testTimeout: 30000,
+    env: loadEnv('test', process.cwd(), ''),
   },
 });

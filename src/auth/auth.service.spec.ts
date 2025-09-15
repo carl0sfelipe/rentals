@@ -8,8 +8,16 @@ const mockUsers: MockUser[] = [];
 
 const prismaMock = {
   user: {
+    count: vi.fn(async () => mockUsers.length),
     findUnique: vi.fn(async (args: any) => mockUsers.find(u => u.email === args.where.email) || null),
     create: vi.fn(async (args: any) => {
+      // Simular erro P2002 se email já existir
+      const exists = mockUsers.find(u => u.email === args.data.email);
+      if (exists) {
+        const error: any = new Error('Unique constraint violation');
+        error.code = 'P2002';
+        throw error;
+      }
       const newUser: MockUser = { id: String(mockUsers.length + 1), ...args.data };
       mockUsers.push(newUser);
       return newUser;
@@ -36,8 +44,8 @@ describe('AuthService (unit)', () => {
   describe('register', () => {
     it('deve criar novo usuário quando email não existe', async () => {
       const res = await (service as any).register({ email: 'a@a.com', password: '123456' });
-      expect(res).toHaveProperty('id');
-      expect(res.email).toBe('a@a.com');
+      expect(res).toHaveProperty('access_token');
+      expect(res.access_token).toBe('signed-jwt-token');
       expect((hasherMock.hash as any)).toHaveBeenCalledTimes(1);
       expect(prismaMock.user.create).toHaveBeenCalledTimes(1);
     });
@@ -58,6 +66,7 @@ describe('AuthService (unit)', () => {
   describe('login', () => {
     it('deve retornar access_token para credenciais válidas', async () => {
       await (service as any).register({ email: 'login@test.com', password: 'pw' });
+      vi.clearAllMocks(); // Limpar contadores de mock antes do login
       const res = await (service as any).login({ email: 'login@test.com', password: 'pw' });
       expect(res).toEqual({ access_token: 'signed-jwt-token' });
       expect(jwtMock.signAsync).toHaveBeenCalledTimes(1);

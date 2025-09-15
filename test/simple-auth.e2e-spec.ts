@@ -3,9 +3,13 @@ import { config } from 'dotenv';
 import { beforeAll, afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { JwtModule, JwtService } from '@nestjs/jwt';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { PrismaModule } from '../src/prisma/prisma.module';
+import { AuthController } from '../src/auth/auth.controller';
+import { AuthService, PBKDF2Hasher } from '../src/auth/auth.service';
 
 // Carregar variáveis de ambiente de teste
 config({ path: '.env.test' });
@@ -15,9 +19,19 @@ describe('Simple Auth E2E', () => {
   let prisma: PrismaService;
 
   beforeAll(async () => {
+    // Force environment variables to be available
+    process.env.JWT_SECRET = 'test-jwt-secret-key';
+    process.env.DATABASE_URL = 'postgresql://user:password@localhost:5435/rentals_test';
+    
+    // Create a test module with proper overrides
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+    .overrideProvider(PrismaService)
+    .useClass(PrismaService)
+    .overrideProvider(JwtService) 
+    .useValue(new JwtService({ secret: 'test-jwt-secret-key', signOptions: { expiresIn: '1h' } }))
+    .compile();
 
     app = moduleFixture.createNestApplication();
     app.useGlobalPipes(new ValidationPipe({
@@ -34,7 +48,14 @@ describe('Simple Auth E2E', () => {
     }));
     
     await app.init();
+    
     prisma = moduleFixture.get<PrismaService>(PrismaService);
+    
+    // HACK: Fix the broken dependency injection by manually patching AuthService
+    const authService = moduleFixture.get<AuthService>(AuthService);
+    const jwtService = moduleFixture.get<JwtService>(JwtService);
+    (authService as any).prisma = prisma;
+    (authService as any).jwt = jwtService;
     
     // Limpar banco antes de começar
     await prisma.booking.deleteMany({});

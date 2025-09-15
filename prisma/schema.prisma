@@ -7,43 +7,126 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id         String     @id @default(uuid()) @db.Uuid
-  email      String     @unique
-  name       String
-  password   String
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
+// === ORGANIZAÇÃO (ORG-LITE) ===
+
+model Organization {
+  id        String              @id @default(uuid()) @db.Uuid
+  name      String
+  slug      String              @unique
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+
+  // Relações
+  members    OrganizationUser[]
   properties Property[]
+  bookings   Booking[]
+
+  @@map("organizations")
 }
 
+model OrganizationUser {
+  id             String           @id @default(uuid()) @db.Uuid
+  role           OrganizationRole @default(MEMBER)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  // Foreign Keys
+  userId         String @db.Uuid
+  organizationId String @db.Uuid
+
+  // Relações
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+  @@index([organizationId])
+  @@index([userId])
+  @@map("organization_users")
+}
+
+model User {
+  id                   String             @id @default(uuid()) @db.Uuid
+  email                String             @unique
+  name                 String
+  password             String
+  activeOrganizationId String?            @db.Uuid
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  // Relações
+  organizations OrganizationUser[]
+  properties    Property[]         // Legacy - mantido durante transição
+
+  @@index([activeOrganizationId])
+  @@map("users")
+}
+
+// === RECURSOS TENANT-SCOPED ===
+
 model Property {
-  id            String    @id @default(uuid()) @db.Uuid
+  id            String   @id @default(uuid()) @db.Uuid
   title         String
   description   String
   address       String
   pricePerNight Float
   bedrooms      Int
   bathrooms     Int
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  userId        String    @db.Uuid
-  bookings      Booking[]
-  user          User      @relation(fields: [userId], references: [id])
+  imageUrl      String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Tenant Context (nullable durante migração)
+  organizationId String? @db.Uuid
+
+  // Foreign Keys (legacy - mantido durante transição)
+  userId String @db.Uuid
+
+  // Relações
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User          @relation(fields: [userId], references: [id])
+  bookings     Booking[]
+
+  @@index([organizationId])
+  @@index([organizationId, createdAt])
+  @@map("properties")
 }
 
 model Booking {
-  id         String      @id @default(cuid())
-  startDate  DateTime
-  endDate    DateTime
-  type       BookingType @default(BLOCKED)
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
-  propertyId String      @db.Uuid
-  property   Property    @relation(fields: [propertyId], references: [id])
+  id        String      @id @default(cuid())
+  startDate DateTime
+  endDate   DateTime
+  type      BookingType @default(BLOCKED)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  // Tenant Context (nullable durante migração)
+  organizationId String? @db.Uuid
+
+  // Foreign Keys
+  propertyId String @db.Uuid
+
+  // Relações
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  property     Property      @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([organizationId, createdAt])
+  @@index([propertyId])
+  @@map("bookings")
+}
+
+// === ENUMS ===
+
+enum OrganizationRole {
+  PROPRIETARIO // Owner: Full ownership access, can transfer ownership: ['*', 'ownership:*']
+  ADMIN        // Full access: ['*']
+  MANAGER      // Property management: ['property:*', 'booking:*', 'calendar:*']
+  MEMBER       // Read-only: ['property:read', 'booking:read', 'calendar:read']
+  CLEANER      // Cleaning tasks: ['cleaning:read', 'cleaning:updateSelf']
 }
 
 enum BookingType {
   BLOCKED
   RESERVATION
+  MAINTENANCE
 }

@@ -1,6 +1,33 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
 
 // ============================================================================
+// FEATURE FLAGS (CONFIGURAÇÃO ÚNICA)
+// ============================================================================
+// Estado da configuração
+let MULTI_TENANT_ENABLED = false;
+let CONFIG_LOADED = false;
+
+// Função para carregar configuração do backend
+const loadConfig = async () => {
+  try {
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    const response = await fetch(`${apiUrl}/config/feature-flags`);
+    if (response.ok) {
+      const config = await response.json();
+      MULTI_TENANT_ENABLED = config.MULTI_TENANT_ENABLED;
+      CONFIG_LOADED = true;
+      console.log('🚀 Configuração carregada:', { MULTI_TENANT_ENABLED });
+      return true;
+    }
+  } catch (error) {
+    console.warn('Erro ao carregar configuração, usando padrão');
+    MULTI_TENANT_ENABLED = false;
+    CONFIG_LOADED = true;
+  }
+  return false;
+};
+
+// ============================================================================
 // CONTEXTO DE AUTENTICAÇÃO
 // ============================================================================
 const AuthContext = createContext();
@@ -17,7 +44,7 @@ const useAuth = () => {
 // ============================================================================
 // UTILITÁRIOS E CONFIGURAÇÕES
 // ============================================================================
-const API_BASE_URL = 'http://localhost:3000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 // ============================================================================
 // FUNÇÕES DE API (CONECTADAS AO BACKEND REAL)
@@ -107,6 +134,43 @@ const apiService = {
         throw new Error('Erro de conexão. Verifique se o servidor está rodando.');
       }
       // Re-throw outros erros
+      throw error;
+    }
+  },
+
+  // Registra novo usuário
+  register: async (name, email, password) => {
+    try {
+      const response = await fetch('http://localhost:3000/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name,
+          email,
+          password,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        if (response.status === 409) {
+          throw new Error('Email já está em uso');
+        }
+        throw new Error(errorData.message || 'Erro ao criar conta');
+      }
+
+      const data = await response.json();
+      
+      return {
+        access_token: data.access_token,
+        user: { email, name }
+      };
+    } catch (error) {
+      if (error.name === 'TypeError' && error.message.includes('fetch')) {
+        throw new Error('Erro de conexão. Verifique se o servidor está rodando.');
+      }
       throw error;
     }
   },
@@ -273,6 +337,124 @@ const apiService = {
       return true;
     } catch (error) {
       console.error('Erro ao deletar propriedade:', error);
+      throw error;
+    }
+  },
+
+  // === FUNÇÕES DE MEMBROS DA ORGANIZAÇÃO ===
+
+  // Lista membros da organização
+  getMembers: async () => {
+    try {
+      const response = await fetchWithAuth('http://localhost:3000/organizations/members');
+      
+      if (!response.ok) {
+        throw new Error('Erro ao carregar membros');
+      }
+      
+      const members = await response.json();
+      return members;
+    } catch (error) {
+      console.error('Erro ao buscar membros:', error);
+      return [];
+    }
+  },
+
+  // Adiciona um membro à organização
+  addMember: async (email, role) => {
+    try {
+      const response = await fetchWithAuth('http://localhost:3000/organizations/members', {
+        method: 'POST',
+        body: JSON.stringify({ email, role }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Erro ao adicionar membro');
+      }
+
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error('Erro ao adicionar membro:', error);
+      throw error;
+    }
+  },
+
+  // Remove um membro da organização
+  removeMember: async (userId) => {
+    try {
+      const response = await fetchWithAuth(`http://localhost:3000/organizations/members/${userId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Erro ao remover membro');
+      }
+
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error('Erro ao remover membro:', error);
+      throw error;
+    }
+  },
+
+  // Atualiza role de um membro
+  updateMemberRole: async (userId, role) => {
+    try {
+      const response = await fetchWithAuth(`http://localhost:3000/organizations/members/${userId}/role`, {
+        method: 'PATCH',
+        body: JSON.stringify({ role }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Erro ao atualizar função');
+      }
+
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error('Erro ao atualizar função:', error);
+      throw error;
+    }
+  },
+
+  // Lista organizações do usuário
+  getMyOrganizations: async () => {
+    try {
+      const response = await fetchWithAuth('http://localhost:3000/organizations/members/my-organizations');
+      
+      if (!response.ok) {
+        throw new Error('Erro ao carregar organizações');
+      }
+      
+      const organizations = await response.json();
+      return organizations;
+    } catch (error) {
+      console.error('Erro ao buscar organizações:', error);
+      return [];
+    }
+  },
+
+  // Troca de organização ativa
+  switchOrganization: async (organizationId) => {
+    try {
+      const response = await fetchWithAuth(`http://localhost:3000/organizations/members/switch/${organizationId}`, {
+        method: 'POST',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Erro ao trocar organização');
+      }
+
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error('Erro ao trocar organização:', error);
       throw error;
     }
   }
@@ -561,7 +743,10 @@ const PropertyForm = ({ property, onSave, onCancel, loading }) => {
     pricePerNight: property?.pricePerNight || '',
     bedrooms: property?.bedrooms || '',
     bathrooms: property?.bathrooms || '',
+    imageUrl: property?.imageUrl || '',
   });
+
+  const [imagePreview, setImagePreview] = useState(property?.imageUrl || '');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -578,10 +763,31 @@ const PropertyForm = ({ property, onSave, onCancel, loading }) => {
   };
 
   const handleChange = (e) => {
+    const { name, value } = e.target;
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value,
+      [name]: value,
     });
+
+    // Atualizar preview da imagem quando URL da imagem mudar
+    if (name === 'imageUrl') {
+      setImagePreview(value);
+    }
+  };
+
+  const generateRandomImage = async () => {
+    try {
+      const response = await fetch('http://localhost:3000/unsplash/random');
+      const data = await response.json();
+      setFormData({ ...formData, imageUrl: data.imageUrl });
+      setImagePreview(data.imageUrl);
+    } catch (error) {
+      console.error('Erro ao gerar imagem:', error);
+      // Fallback para URL direta
+      const fallbackUrl = `https://source.unsplash.com/800x600/?architecture,interior,home,apartment,house,modern&${Date.now()}`;
+      setFormData({ ...formData, imageUrl: fallbackUrl });
+      setImagePreview(fallbackUrl);
+    }
   };
 
   return (
@@ -636,6 +842,54 @@ const PropertyForm = ({ property, onSave, onCancel, loading }) => {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
                 placeholder="Endereço completo"
               />
+            </div>
+
+            {/* Campo de Imagem */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                URL da Imagem (opcional)
+              </label>
+              <div className="space-y-2">
+                <div className="flex space-x-2">
+                  <input
+                    type="url"
+                    name="imageUrl"
+                    value={formData.imageUrl}
+                    onChange={handleChange}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    placeholder="https://exemplo.com/imagem.jpg"
+                  />
+                  <button
+                    type="button"
+                    onClick={generateRandomImage}
+                    className="px-3 py-2 text-sm bg-green-100 text-green-700 rounded-md hover:bg-green-200 transition-colors"
+                    title="Gerar imagem aleatória"
+                  >
+                    🎲 Aleatória
+                  </button>
+                </div>
+                
+                {/* Preview da Imagem */}
+                {imagePreview && (
+                  <div className="mt-2">
+                    <img
+                      src={imagePreview}
+                      alt="Preview"
+                      className="w-full h-32 object-cover rounded-md border"
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                      }}
+                      onLoad={(e) => {
+                        e.target.style.display = 'block';
+                      }}
+                    />
+                  </div>
+                )}
+                
+                <p className="text-xs text-gray-500">
+                  Se não fornecida, uma imagem automática será gerada
+                </p>
+              </div>
             </div>
 
             <div className="grid grid-cols-3 gap-3">
@@ -723,9 +977,10 @@ const LoadingSpinner = () => (
 // COMPONENTE: PÁGINA DE LOGIN
 // ============================================================================
 const LoginPage = ({ onLogin }) => {
-  const [formData, setFormData] = useState({ email: '', password: '' });
+  const [formData, setFormData] = useState({ name: '', email: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [isRegister, setIsRegister] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -733,9 +988,19 @@ const LoginPage = ({ onLogin }) => {
     setError('');
 
     try {
-      await onLogin(formData.email, formData.password);
+      if (isRegister) {
+        // Registro
+        const result = await apiService.register(formData.name, formData.email, formData.password);
+        // Auto-login após registro
+        localStorage.setItem('token', result.access_token);
+        localStorage.setItem('user', JSON.stringify(result.user));
+        window.location.reload();
+      } else {
+        // Login
+        await onLogin(formData.email, formData.password);
+      }
     } catch (err) {
-      setError(err.message || 'Erro ao fazer login');
+      setError(err.message || (isRegister ? 'Erro ao criar conta' : 'Erro ao fazer login'));
     } finally {
       setLoading(false);
     }
@@ -748,6 +1013,12 @@ const LoginPage = ({ onLogin }) => {
     });
   };
 
+  const toggleMode = () => {
+    setIsRegister(!isRegister);
+    setError('');
+    setFormData({ name: '', email: '', password: '' });
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <div className="max-w-md w-full space-y-8">
@@ -757,13 +1028,32 @@ const LoginPage = ({ onLogin }) => {
             Rentals Dashboard
           </h2>
           <p className="mt-2 text-sm text-gray-600">
-            Faça login para gerenciar suas propriedades
+            {isRegister ? 'Crie sua conta para começar' : 'Faça login para gerenciar suas propriedades'}
           </p>
         </div>
 
-        {/* Formulário de Login */}
+        {/* Formulário de Login/Registro */}
         <div className="bg-white py-8 px-6 shadow-xl rounded-lg">
           <form className="space-y-6" onSubmit={handleSubmit}>
+            {/* Campo Nome (apenas no registro) */}
+            {isRegister && (
+              <div>
+                <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+                  Nome completo
+                </label>
+                <input
+                  id="name"
+                  name="name"
+                  type="text"
+                  required
+                  value={formData.name}
+                  onChange={handleChange}
+                  className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
+                  placeholder="Seu nome completo"
+                />
+              </div>
+            )}
+
             {/* Campo Email */}
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">
@@ -815,11 +1105,25 @@ const LoginPage = ({ onLogin }) => {
                 {loading ? (
                   <span className="flex items-center">
                     <div className="animate-spin -ml-1 mr-3 h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
-                    Entrando...
+                    {isRegister ? 'Criando conta...' : 'Entrando...'}
                   </span>
                 ) : (
-                  'Entrar'
+                  isRegister ? 'Criar conta' : 'Entrar'
                 )}
+              </button>
+            </div>
+
+            {/* Toggle entre Login e Registro */}
+            <div className="text-center">
+              <button
+                type="button"
+                onClick={toggleMode}
+                className="text-blue-600 hover:text-blue-500 text-sm font-medium"
+              >
+                {isRegister 
+                  ? 'Já tem uma conta? Faça login' 
+                  : 'Não tem conta? Registre-se'
+                }
               </button>
             </div>
           </form>
@@ -913,7 +1217,7 @@ const PropertyCard = ({ property, onCreateBooking, onEdit, onDelete, showActions
         <div className="flex items-center space-x-4 text-sm text-gray-500 mb-4">
           <span className="flex items-center">
             <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2v16a2 2 0 002 2z" />
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 15v-2a2 2 0 012-2h4a2 2 0 012 2v2" />
             </svg>
             {property.bedrooms} quartos
@@ -1083,15 +1387,306 @@ const PropertyCard = ({ property, onCreateBooking, onEdit, onDelete, showActions
 };
 
 // ============================================================================
+// COMPONENTE: GERENCIAMENTO DE MEMBROS
+// ============================================================================
+const MembersManagement = ({ onClose }) => {
+  const [members, setMembers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [addMemberData, setAddMemberData] = useState({ email: '', role: 'MEMBER' });
+  const [addingMember, setAddingMember] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  // Carrega membros
+  useEffect(() => {
+    const loadMembers = async () => {
+      try {
+        const membersData = await apiService.getMembers();
+        setMembers(membersData);
+      } catch (err) {
+        console.error('Erro ao carregar membros:', err);
+        setError('Erro ao carregar membros');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadMembers();
+  }, []);
+
+  // Adicionar membro
+  const handleAddMember = async (e) => {
+    e.preventDefault();
+    setAddingMember(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const result = await apiService.addMember(addMemberData.email, addMemberData.role);
+      setSuccess(`${result.member.user.name} foi adicionado à organização!`);
+      setAddMemberData({ email: '', role: 'MEMBER' });
+      setShowAddForm(false);
+      
+      // Recarrega membros
+      const membersData = await apiService.getMembers();
+      setMembers(membersData);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setAddingMember(false);
+    }
+  };
+
+  // Remover membro
+  const handleRemoveMember = async (userId, userName) => {
+    if (!confirm(`Tem certeza que deseja remover ${userName} da organização?`)) {
+      return;
+    }
+
+    try {
+      await apiService.removeMember(userId);
+      setSuccess(`${userName} foi removido da organização`);
+      
+      // Remove da lista local
+      setMembers(members.filter(m => m.user.id !== userId));
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  // Atualizar role
+  const handleUpdateRole = async (userId, newRole, userName) => {
+    try {
+      await apiService.updateMemberRole(userId, newRole);
+      setSuccess(`Função de ${userName} atualizada para ${newRole}`);
+      
+      // Atualiza na lista local
+      setMembers(members.map(m => 
+        m.user.id === userId ? { ...m, role: newRole } : m
+      ));
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const getRoleColor = (role) => {
+    switch (role) {
+      case 'PROPRIETARIO': return 'bg-purple-100 text-purple-800';
+      case 'ADMIN': return 'bg-red-100 text-red-800';
+      case 'MANAGER': return 'bg-blue-100 text-blue-800';
+      case 'MEMBER': return 'bg-green-100 text-green-800';
+      case 'CLEANER': return 'bg-yellow-100 text-yellow-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getRoleLabel = (role) => {
+    switch (role) {
+      case 'PROPRIETARIO': return 'Proprietário';
+      case 'ADMIN': return 'Administrador';
+      case 'MANAGER': return 'Gerente';
+      case 'MEMBER': return 'Membro';
+      case 'CLEANER': return 'Limpeza';
+      default: return role;
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+        {/* Header */}
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-bold text-gray-900">👥 Gerenciar Membros</h2>
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Mensagens */}
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
+            <p className="text-red-700 text-sm">{error}</p>
+          </div>
+        )}
+        
+        {success && (
+          <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-md">
+            <p className="text-green-700 text-sm">{success}</p>
+          </div>
+        )}
+
+        {/* Botão Adicionar Membro */}
+        <div className="mb-6">
+          <button
+            onClick={() => setShowAddForm(!showAddForm)}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors"
+          >
+            + Adicionar Membro
+          </button>
+        </div>
+
+        {/* Formulário Adicionar Membro */}
+        {showAddForm && (
+          <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+            <h3 className="text-lg font-medium mb-4">Adicionar Novo Membro</h3>
+            <form onSubmit={handleAddMember} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Email do Usuário
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={addMemberData.email}
+                  onChange={(e) => setAddMemberData({ ...addMemberData, email: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="email@exemplo.com"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  O usuário deve já ter uma conta registrada
+                </p>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Função
+                </label>
+                <select
+                  value={addMemberData.role}
+                  onChange={(e) => setAddMemberData({ ...addMemberData, role: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="MEMBER">Membro</option>
+                  <option value="MANAGER">Gerente</option>
+                  <option value="ADMIN">Administrador</option>
+                  <option value="PROPRIETARIO">Proprietário</option>
+                  <option value="CLEANER">Limpeza</option>
+                </select>
+              </div>
+
+              <div className="flex space-x-3">
+                <button
+                  type="submit"
+                  disabled={addingMember}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors disabled:opacity-50"
+                >
+                  {addingMember ? 'Adicionando...' : 'Adicionar'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowAddForm(false)}
+                  className="bg-gray-300 hover:bg-gray-400 text-gray-700 font-medium py-2 px-4 rounded-md transition-colors"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* Lista de Membros */}
+        {loading ? (
+          <div className="text-center py-8">
+            <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto"></div>
+            <p className="mt-2 text-gray-600">Carregando membros...</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {members.map((member) => (
+              <div key={member.id} className="bg-white border border-gray-200 rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-medium">
+                      {member.user.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <h4 className="font-medium text-gray-900">{member.user.name}</h4>
+                      <p className="text-sm text-gray-600">{member.user.email}</p>
+                      <p className="text-xs text-gray-500">
+                        Membro desde {new Date(member.createdAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-3">
+                    {/* Badge da Função */}
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${getRoleColor(member.role)}`}>
+                      {getRoleLabel(member.role)}
+                    </span>
+
+                    {/* Dropdown para alterar função */}
+                    <select
+                      value={member.role}
+                      onChange={(e) => handleUpdateRole(member.user.id, e.target.value, member.user.name)}
+                      className="text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="MEMBER">Membro</option>
+                      <option value="MANAGER">Gerente</option>
+                      <option value="ADMIN">Administrador</option>
+                      <option value="PROPRIETARIO">Proprietário</option>
+                      <option value="CLEANER">Limpeza</option>
+                    </select>
+
+                    {/* Botão Remover */}
+                    <button
+                      onClick={() => handleRemoveMember(member.user.id, member.user.name)}
+                      className="text-red-600 hover:text-red-800 text-sm font-medium"
+                    >
+                      Remover
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {members.length === 0 && (
+              <div className="text-center py-8">
+                <p className="text-gray-600">Nenhum membro encontrado</p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
 // COMPONENTE: PÁGINA DO DASHBOARD
 // ============================================================================
-const DashboardPage = ({ user, onLogout }) => {
+const DashboardPage = ({ user, activeOrganizationId, onLogout }) => {
   const [properties, setProperties] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showPropertyForm, setShowPropertyForm] = useState(false);
   const [editingProperty, setEditingProperty] = useState(null);
   const [formLoading, setFormLoading] = useState(false);
+  const [showMembersManagement, setShowMembersManagement] = useState(false);
+  const [multiTenantEnabled, setMultiTenantEnabled] = useState(false);
   const { token } = useAuth();
+
+  // Carrega configuração multi-tenant
+  useEffect(() => {
+    const loadConfig = async () => {
+      try {
+        const response = await fetch('http://localhost:3000/config/feature-flags');
+        if (response.ok) {
+          const config = await response.json();
+          setMultiTenantEnabled(config.MULTI_TENANT_ENABLED);
+          console.log('🚀 Multi-tenant configurado:', config.MULTI_TENANT_ENABLED);
+        }
+      } catch (error) {
+        console.warn('Erro ao carregar configuração multi-tenant');
+        setMultiTenantEnabled(false);
+      }
+    };
+    loadConfig();
+  }, []);
 
   // Carrega propriedades ao montar o componente
   useEffect(() => {
@@ -1194,6 +1789,14 @@ const DashboardPage = ({ user, onLogout }) => {
               </div>
             </div>
             <div className="flex space-x-3">
+              {multiTenantEnabled && (
+                <button
+                  onClick={() => setShowMembersManagement(true)}
+                  className="bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 px-4 rounded-md transition-colors"
+                >
+                  👥 Membros
+                </button>
+              )}
               <button
                 onClick={() => setShowPropertyForm(true)}
                 className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors"
@@ -1264,6 +1867,11 @@ const DashboardPage = ({ user, onLogout }) => {
               loading={formLoading}
             />
           )}
+
+          {/* Gerenciamento de Membros (Modal) */}
+          {multiTenantEnabled && showMembersManagement && (
+            <MembersManagement onClose={() => setShowMembersManagement(false)} />
+          )}
         </div>
       </main>
     </div>
@@ -1278,9 +1886,21 @@ const App = () => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
   const [page, setPage] = useState('login');
+  const [configLoaded, setConfigLoaded] = useState(false);
+
+  // Carrega configuração do backend
+  useEffect(() => {
+    const initializeConfig = async () => {
+      await loadConfig();
+      setConfigLoaded(true);
+    };
+    initializeConfig();
+  }, []);
 
   // Verifica se há token salvo no localStorage ao inicializar
   useEffect(() => {
+    if (!configLoaded) return; // Espera configuração carregar
+    
     const savedToken = localStorage.getItem('authToken');
     const savedUser = localStorage.getItem('authUser');
     
@@ -1299,7 +1919,7 @@ const App = () => {
     } else {
       setPage('login');
     }
-  }, []);
+  }, [configLoaded]);
 
   // Verifica periodicamente se o token ainda é válido (a cada 30 segundos)
   useEffect(() => {
@@ -1363,11 +1983,21 @@ const App = () => {
     <AuthContext.Provider value={authContextValue}>
       <div className="App">
         {/* Roteamento simples baseado em estado */}
-        {page === 'login' && (
+        {/* Loading state enquanto configuração carrega */}
+        {!configLoaded && (
+          <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <p className="text-gray-600">Carregando configuração...</p>
+            </div>
+          </div>
+        )}
+
+        {configLoaded && page === 'login' && (
           <LoginPage onLogin={handleLogin} />
         )}
         
-        {page === 'dashboard' && user && (
+        {configLoaded && page === 'dashboard' && user && (
           <DashboardPage user={user} onLogout={handleLogout} />
         )}
       </div>

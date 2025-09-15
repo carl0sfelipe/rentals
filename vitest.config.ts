@@ -17,7 +17,7 @@ export default defineConfig({
     },
     // Configurações de ambiente para testes
     env: {
-      DATABASE_URL: "postgresql://user:password@localhost:5433/rentaldb",
+      DATABASE_URL: "postgresql://user:password@localhost:5435/rentals_test",
       JWT_SECRET: "test-secret-key",
       NODE_ENV: "test"
     },

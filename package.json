@@ -6,6 +6,7 @@
     "prebuild": "rimraf dist",
     "build": "nest build",
     "start": "node dist/main.js",
+    "start:prod": "node dist/main.js",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "lint": "eslint './src/**/*.{ts,tsx}' --fix",
@@ -15,6 +16,10 @@
     "test:watch": "vitest --watch",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
     "test:coverage": "vitest run --coverage",
+    "test:setup": "./scripts/run-tests.sh setup",
+    "test:all": "./scripts/run-tests.sh all",
+    "test:unit:env": "./scripts/run-tests.sh unit",
+    "test:e2e:env": "./scripts/run-tests.sh e2e",
     "postinstall": "prisma generate",
     "seed:dev": "./scripts/seed-dev.sh",
     "db:dev": "docker compose up -d db_dev",
@@ -50,10 +55,14 @@
     "prisma": "^6.16.1",
     "rimraf": "^5.0.0",
     "supertest": "^7.0.0",
+    "ts-node": "^10.9.2",
     "typescript": "^5.0.0",
     "vitest": "^1.6.0"
   },
   "engines": {
     "node": ">=20"
+  },
+  "prisma": {
+    "seed": "ts-node prisma/seed.ts"
   }
 }

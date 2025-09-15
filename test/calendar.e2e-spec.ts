@@ -4,6 +4,10 @@ import { beforeAll, afterAll, beforeEach, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { AuthService } from '../src/auth/auth.service';
+import { JwtService } from '@nestjs/jwt';
+import { PropertiesService } from '../src/properties/properties.service';
+import { UnsplashService } from '../src/unsplash/unsplash.service';
 
 describe('Calendar E2E', () => {
   let app: INestApplication;
@@ -33,6 +37,20 @@ describe('Calendar E2E', () => {
     await app.init();
 
     prisma = moduleRef.get(PrismaService);
+    
+    // MANUAL DEPENDENCY INJECTION FIX for E2E tests
+    // In Vitest E2E environment, service dependencies are injecting as undefined
+    // This is a workaround to manually patch the services after module compilation
+    const authService = moduleRef.get<AuthService>(AuthService);
+    const jwtService = moduleRef.get<JwtService>(JwtService);
+    const propertiesService = moduleRef.get<PropertiesService>(PropertiesService);
+    const unsplashService = moduleRef.get<UnsplashService>(UnsplashService);
+    
+    // Manually assign the dependencies
+    (authService as any).prisma = prisma;
+    (authService as any).jwt = jwtService;
+    (propertiesService as any).prisma = prisma;
+    (propertiesService as any).unsplashService = unsplashService;
 
     // Limpar banco antes de começar
     await prisma.booking.deleteMany({});

@@ -1,6 +1,8 @@
 import { ConflictException, Injectable, UnauthorizedException, Inject } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
+import { OrganizationRole } from '@prisma/client';
+import { isMultiTenantEnabled } from '../config/feature-flags';
 import * as crypto from 'crypto';
 
 export class RegisterDto { email!: string; password!: string; name!: string; }
@@ -31,22 +33,31 @@ export class PBKDF2Hasher implements PasswordHasher {
 @Injectable()
 export class AuthService {
   constructor(
-    @Inject(PrismaService) private readonly prisma: PrismaService,
-    @Inject(JwtService) private readonly jwt: JwtService,
-    @Inject('PasswordHasher') private readonly hasher: PasswordHasher,
+    private readonly prisma: PrismaService,
+    private readonly jwt: JwtService,
+    @Inject('PasswordHasher') private readonly hasher: PasswordHasher
   ) {}
 
   async register(dto: RegisterDto) {
-    const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
-    if (existing) throw new ConflictException('Email already in use');
-
-    const hashed = await this.hasher.hash(dto.password);
     try {
-      // Retorna apenas campos seguros
-      return await this.prisma.user.create({
-        data: { email: dto.email, password: hashed, name: dto.name },
-        select: { id: true, email: true, name: true },
+      const hashed = await this.hasher.hash(dto.password);
+      
+      // Simplified single-tenant only approach
+      const user = await this.prisma.user.create({
+        data: { email: dto.email, password: hashed, name: dto.name }
       });
+
+      const result = { 
+        access_token: await this.jwt.signAsync({ 
+          sub: user.id, 
+          email: user.email
+        }),
+        id: user.id,
+        email: user.email,
+        name: user.name
+      };
+
+      return result;
     } catch (err: any) {
       // Prisma unique constraint (race condition)
       if (err?.code === 'P2002') throw new ConflictException('Email already in use');
@@ -55,10 +66,38 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
-    const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
+    const user = await this.prisma.user.findUnique({ 
+      where: { email: dto.email }
+    });
     if (!user) throw new UnauthorizedException('Invalid credentials');
+    
     const valid = await this.hasher.compare(dto.password, user.password);
     if (!valid) throw new UnauthorizedException('Invalid credentials');
-    return { access_token: await this.jwt.signAsync({ sub: user.id, email: user.email }) };
+    
+    if (isMultiTenantEnabled()) {
+      // Get user's primary organization (MULTI-TENANT MODE)
+      const userOrg = await this.prisma.organizationUser.findFirst({
+        where: { userId: user.id },
+        include: { organization: true }
+      });
+      
+      const activeOrganizationId = userOrg?.organizationId || null;
+
+      return { 
+        access_token: await this.jwt.signAsync({ 
+          sub: user.id, 
+          email: user.email,
+          activeOrganizationId
+        }) 
+      };
+    } else {
+      // Simple login (SINGLE-TENANT MODE)
+      return { 
+        access_token: await this.jwt.signAsync({ 
+          sub: user.id, 
+          email: user.email
+        }) 
+      };
+    }
   }
 }
