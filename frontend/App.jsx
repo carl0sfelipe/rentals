@@ -1790,6 +1790,26 @@ const DashboardPage = ({ user, activeOrganizationId, onLogout }) => {
     setShowProfessionalAd(true);
   };
 
+  // Handle anúncio público (para visitantes)
+  const handlePublicAd = async (slug) => {
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      const response = await fetch(`${apiUrl}/properties/public/${slug}`);
+
+      if (!response.ok) {
+        throw new Error('Anúncio não encontrado');
+      }
+
+      const property = await response.json();
+      setSelectedProperty(property);
+      setShowProfessionalAd(true);
+      setPage('public-ad'); // Novo estado para anúncios públicos
+    } catch (error) {
+      console.error('Erro ao carregar anúncio público:', error);
+      alert('Anúncio não encontrado ou expirado');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -1917,6 +1937,28 @@ const App = () => {
   const [token, setToken] = useState(null);
   const [page, setPage] = useState('login');
   const [configLoaded, setConfigLoaded] = useState(false);
+  const [selectedProperty, setSelectedProperty] = useState(null);
+  const [showProfessionalAd, setShowProfessionalAd] = useState(false);
+
+  // Handle anúncio público (para visitantes)
+  const handlePublicAd = async (slug) => {
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      const response = await fetch(`${apiUrl}/properties/public/${slug}`);
+
+      if (!response.ok) {
+        throw new Error('Anúncio não encontrado');
+      }
+
+      const property = await response.json();
+      setSelectedProperty(property);
+      setShowProfessionalAd(true);
+      setPage('public-ad'); // Novo estado para anúncios públicos
+    } catch (error) {
+      console.error('Erro ao carregar anúncio público:', error);
+      alert('Anúncio não encontrado ou expirado');
+    }
+  };
 
   // Carrega configuração do backend
   useEffect(() => {
@@ -1930,10 +1972,21 @@ const App = () => {
   // Verifica se há token salvo no localStorage ao inicializar
   useEffect(() => {
     if (!configLoaded) return; // Espera configuração carregar
-    
+
+    // Verifica se é um anúncio público (URL contém /public/)
+    const path = window.location.pathname;
+    if (path.startsWith('/public/')) {
+      const slug = path.replace('/public/', '');
+      if (slug) {
+        // Carrega anúncio público
+        handlePublicAd(slug);
+        return;
+      }
+    }
+
     const savedToken = localStorage.getItem('authToken');
     const savedUser = localStorage.getItem('authUser');
-    
+
     if (savedToken && savedUser) {
       // Verifica se o token ainda é válido
       if (isTokenValid(savedToken)) {
@@ -2029,6 +2082,16 @@ const App = () => {
         
         {configLoaded && page === 'dashboard' && user && (
           <DashboardPage user={user} onLogout={handleLogout} />
+        )}
+
+        {configLoaded && page === 'public-ad' && selectedProperty && (
+          <ProfessionalAd
+            property={selectedProperty}
+            onClose={() => {
+              setSelectedProperty(null);
+              setPage('login');
+            }}
+          />
         )}
       </div>
     </AuthContext.Provider>

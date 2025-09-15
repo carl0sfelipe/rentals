@@ -164,4 +164,67 @@ export class PropertiesService {
     const seconds = date.getUTCSeconds().toString().padStart(2, '0');
     return `${year}${month}${day}T${hours}${minutes}${seconds}Z`;
   }
+
+  async publishAd(userId: string, propertyId: string) {
+    // Verificar se a propriedade existe e se o usuário tem acesso
+    const property = await this.prisma.property.findUnique({
+      where: { id: propertyId }
+    });
+
+    if (!property) {
+      throw new Error('Property not found');
+    }
+
+    if (property.userId !== userId) {
+      throw new Error('Access denied');
+    }
+
+    // Gerar slug único baseado no ID da propriedade (abordagem segura sem mudanças no schema)
+    const slug = `ad-${propertyId}`;
+
+    // Gerar URL pública (ajuste conforme seu domínio)
+    const publicUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/public/${slug}`;
+
+    return {
+      publicUrl,
+      slug,
+      property: {
+        id: property.id,
+        title: property.title,
+        description: property.description,
+        address: property.address,
+        pricePerNight: property.pricePerNight,
+        bedrooms: property.bedrooms,
+        bathrooms: property.bathrooms,
+        imageUrl: property.imageUrl
+      }
+    };
+  }
+
+  async getPublicAd(slug: string) {
+    // Extrair o ID da propriedade do slug
+    const propertyId = slug.replace('ad-', '');
+
+    const property = await this.prisma.property.findUnique({
+      where: { id: propertyId }
+    });
+
+    if (!property) {
+      throw new Error('Ad not found');
+    }
+
+    return {
+      id: property.id,
+      title: property.title,
+      description: property.description,
+      address: property.address,
+      pricePerNight: property.pricePerNight,
+      bedrooms: property.bedrooms,
+      bathrooms: property.bathrooms,
+      imageUrl: property.imageUrl,
+      publishedAt: property.createdAt // Usar createdAt como publishedAt
+    };
+  }
+
+
 }

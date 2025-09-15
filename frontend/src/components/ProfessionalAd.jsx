@@ -1,5 +1,32 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
+// API helper function
+const publishAd = async (propertyId) => {
+  const token = localStorage.getItem('authToken');
+  if (!token) {
+    throw new Error('Usuário não autenticado');
+  }
+
+  // Usar URL absoluta baseada na configuração do ambiente
+  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+  const response = await fetch(`${apiUrl}/properties/${propertyId}/publish`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Erro ao publicar anúncio');
+  }
+
+  return response.json();
+};
+
+
+
 // Componentes de ícones SVG inline para substituir lucide-react
 const Star = ({ size = 16, className = "" }) => (
   <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
@@ -403,6 +430,7 @@ export default function VacationRentalLanding({ property, onClose }) {
   const [guests, setGuests] = useState(2);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [viewCount, setViewCount] = useState(127);
+  const [isPublishing, setIsPublishing] = useState(false);
 
   // Usar dados da propriedade dinâmica
   const basePrice = property?.pricePerNight || 420;
@@ -444,6 +472,31 @@ export default function VacationRentalLanding({ property, onClose }) {
   const nights = dateRange.start && dateRange.end ? diffNights(dateRange.start, dateRange.end) : 0;
   const subtotal = nights * promoPrice;
 
+  const handlePublish = async () => {
+    if (!property?.id) {
+      alert('Erro: Propriedade não encontrada');
+      return;
+    }
+
+    setIsPublishing(true);
+    try {
+      const result = await publishAd(property.id);
+
+      // Copiar URL para a área de transferência
+      if (result.publicUrl) {
+        navigator.clipboard.writeText(result.publicUrl);
+        alert(`✅ Anúncio publicado com sucesso!\n\nURL copiada: ${result.publicUrl}`);
+      }
+    } catch (error) {
+      console.error('Erro ao publicar:', error);
+      alert(`❌ Erro ao publicar anúncio: ${error.message}`);
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
+
+
   return (
     <div className="min-h-screen bg-white">
       <style>{`
@@ -455,9 +508,35 @@ export default function VacationRentalLanding({ property, onClose }) {
       <nav className="sticky top-0 w-full bg-white/90 backdrop-blur-sm border-b border-gray-100 z-40">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="font-bold text-xl text-gray-900">{property?.title || 'OceanView Apt'}</div>
-          <div className="flex items-center gap-3 text-sm text-gray-700">
-            <Clock size={16} />
-            <span className="animate-pulse">{viewCount} pessoas vendo agora</span>
+          <div className="flex items-center gap-3">
+            <div className="text-sm text-gray-700">
+              <Clock size={16} className="inline mr-1" />
+              <span className="animate-pulse">{viewCount} pessoas vendo agora</span>
+            </div>
+
+            <button
+              onClick={handlePublish}
+              disabled={isPublishing}
+              className="bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center gap-2"
+            >
+              {isPublishing ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  Publicando...
+                </>
+              ) : (
+                <>
+                  🚀 Publicar
+                </>
+              )}
+            </button>
+
+            <button
+              onClick={onClose}
+              className="bg-gray-600 hover:bg-gray-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+            >
+              ✕ Fechar
+            </button>
           </div>
         </div>
       </nav>
