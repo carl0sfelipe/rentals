@@ -33,69 +33,31 @@ export class PBKDF2Hasher implements PasswordHasher {
 @Injectable()
 export class AuthService {
   constructor(
-    private prisma: PrismaService,
-    private jwt: JwtService,
-    @Inject('PasswordHasher') private hasher: PasswordHasher,
+    private readonly prisma: PrismaService,
+    private readonly jwt: JwtService,
+    @Inject('PasswordHasher') private readonly hasher: PasswordHasher
   ) {}
 
   async register(dto: RegisterDto) {
     try {
       const hashed = await this.hasher.hash(dto.password);
       
-      if (isMultiTenantEnabled()) {
-        // Create user and organization in a transaction (MULTI-TENANT MODE)
-        const result = await this.prisma.$transaction(async (tx) => {
-          // Create the user
-          const user = await tx.user.create({
-            data: { email: dto.email, password: hashed, name: dto.name }
-          });
+      // Simplified single-tenant only approach
+      const user = await this.prisma.user.create({
+        data: { email: dto.email, password: hashed, name: dto.name }
+      });
 
-          // Create organization for the user (Org-Lite: each user gets their own org)
-          const organization = await tx.organization.create({
-            data: {
-              name: `${dto.name}'s Organization`,
-              slug: `${dto.email.split('@')[0]}-${Date.now()}`, // Simple slug generation
-            }
-          });
+      const result = { 
+        access_token: await this.jwt.signAsync({ 
+          sub: user.id, 
+          email: user.email
+        }),
+        id: user.id,
+        email: user.email,
+        name: user.name
+      };
 
-          // Add user as PROPRIETARIO of their organization (owner of their own org)
-          await tx.organizationUser.create({
-            data: {
-              userId: user.id,
-              organizationId: organization.id,
-              role: 'PROPRIETARIO' as OrganizationRole
-            }
-          });
-
-          // Update user's activeOrganizationId
-          await tx.user.update({
-            where: { id: user.id },
-            data: { activeOrganizationId: organization.id }
-          });
-
-          return { user, organization };
-        });
-
-        return { 
-          access_token: await this.jwt.signAsync({ 
-            sub: result.user.id, 
-            email: result.user.email,
-            activeOrganizationId: result.organization.id
-          }) 
-        };
-      } else {
-        // Simple user creation (SINGLE-TENANT MODE)
-        const user = await this.prisma.user.create({
-          data: { email: dto.email, password: hashed, name: dto.name }
-        });
-
-        return { 
-          access_token: await this.jwt.signAsync({ 
-            sub: user.id, 
-            email: user.email
-          }) 
-        };
-      }
+      return result;
     } catch (err: any) {
       // Prisma unique constraint (race condition)
       if (err?.code === 'P2002') throw new ConflictException('Email already in use');

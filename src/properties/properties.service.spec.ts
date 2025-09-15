@@ -63,12 +63,11 @@ describe('PropertiesService (unit)', () => {
   beforeEach(() => {
     properties.length = 0;
     vi.clearAllMocks();
-    // Mock OrganizationContextService
-    const mockOrgContext = {
-      getActiveOrganizationId: vi.fn().mockReturnValue(null),
-      setActiveOrganizationId: vi.fn(),
+    // Mock UnsplashService
+    const mockUnsplashService = {
+      getRandomCuratedArchitectureImage: vi.fn().mockReturnValue('https://example.com/image.jpg'),
     };
-    service = new PropertiesService(prismaMock as any, mockOrgContext as any);
+    service = new PropertiesService(prismaMock as any, mockUnsplashService as any);
   });
 
   describe('create', () => {

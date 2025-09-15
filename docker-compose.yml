@@ -8,7 +8,7 @@ services:
     container_name: rentals_api
     build:
       context: .
-      target: development
+      target: build
       args:
         - NODE_VERSION=20-alpine
     # Monta o código local para dentro do container permitindo hot reload.
@@ -17,9 +17,12 @@ services:
     command: sh -c "npx prisma generate && npm run start:dev"
     ports:
       - "3000:3000"
-    env_file: .env.development
+    # env_file: .env.development
     environment:
       - PORT=3000
+      - DATABASE_URL=postgresql://user:password@db_dev:5432/rentals_dev
+      - NODE_ENV=development
+      - JWT_SECRET=your-super-secret-jwt-key-here-change-in-production
     depends_on:
       db_dev:
         condition: service_healthy

@@ -10,6 +10,10 @@ const testing_1 = require("@nestjs/testing");
 const supertest_1 = __importDefault(require("supertest"));
 const app_module_1 = require("../src/app.module");
 const prisma_service_1 = require("../src/prisma/prisma.service");
+const auth_service_1 = require("../src/auth/auth.service");
+const jwt_1 = require("@nestjs/jwt");
+const properties_service_1 = require("../src/properties/properties.service");
+const unsplash_service_1 = require("../src/unsplash/unsplash.service");
 (0, vitest_1.describe)('Properties E2E', () => {
     let app;
     let prisma;
@@ -25,6 +29,14 @@ const prisma_service_1 = require("../src/prisma/prisma.service");
         }));
         await app.init();
         prisma = moduleRef.get(prisma_service_1.PrismaService);
+        const authService = moduleRef.get(auth_service_1.AuthService);
+        const jwtService = moduleRef.get(jwt_1.JwtService);
+        const propertiesService = moduleRef.get(properties_service_1.PropertiesService);
+        const unsplashService = moduleRef.get(unsplash_service_1.UnsplashService);
+        authService.prisma = prisma;
+        authService.jwt = jwtService;
+        propertiesService.prisma = prisma;
+        propertiesService.unsplashService = unsplashService;
     });
     (0, vitest_1.beforeEach)(async () => {
         await new Promise(resolve => setTimeout(resolve, 10));

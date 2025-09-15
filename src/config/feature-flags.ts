@@ -57,13 +57,13 @@ const featureFlags: FeatureFlags = {
 };
 
 // Funções helper para verificar features específicas
-export const isMultiTenantEnabled = (): boolean => featureFlags.MULTI_TENANT_ENABLED;
-export const isOrganizationManagementEnabled = (): boolean => featureFlags.ORGANIZATION_MANAGEMENT;
-export const isRoleBasedPermissionsEnabled = (): boolean => featureFlags.ROLE_BASED_PERMISSIONS;
-export const isTenantIsolationEnabled = (): boolean => featureFlags.TENANT_ISOLATION;
-export const isOrganizationContextEnabled = (): boolean => featureFlags.ORGANIZATION_CONTEXT;
-export const isDebugOrganizationContext = (): boolean => config.DEBUG_ORGANIZATION_CONTEXT;
-export const isStrictTenantValidation = (): boolean => config.STRICT_TENANT_VALIDATION;
+export const isMultiTenantEnabled = (): boolean => config.MULTI_TENANT_ENABLED;
+export const isOrganizationManagementEnabled = (): boolean => config.MULTI_TENANT_ENABLED;
+export const isRoleBasedPermissionsEnabled = (): boolean => config.MULTI_TENANT_ENABLED;
+export const isTenantIsolationEnabled = (): boolean => config.MULTI_TENANT_ENABLED;
+export const isOrganizationContextEnabled = (): boolean => config.MULTI_TENANT_ENABLED;
+export const isDebugOrganizationContext = (): boolean => config.DEBUG_ORGANIZATION_CONTEXT || true;
+export const isStrictTenantValidation = (): boolean => config.MULTI_TENANT_ENABLED;
 
 // Função para obter todas as configurações
 export const getFeatureFlags = (): FeatureFlags => config;

@@ -50,11 +50,10 @@ const prismaMock = {
     (0, vitest_1.beforeEach)(() => {
         properties.length = 0;
         vitest_1.vi.clearAllMocks();
-        const mockOrgContext = {
-            getActiveOrganizationId: vitest_1.vi.fn().mockReturnValue(null),
-            setActiveOrganizationId: vitest_1.vi.fn(),
+        const mockUnsplashService = {
+            getRandomCuratedArchitectureImage: vitest_1.vi.fn().mockReturnValue('https://example.com/image.jpg'),
         };
-        service = new properties_service_1.PropertiesService(prismaMock, mockOrgContext);
+        service = new properties_service_1.PropertiesService(prismaMock, mockUnsplashService);
     });
     (0, vitest_1.describe)('create', () => {
         (0, vitest_1.it)('cria propriedade para o usuário', async () => {

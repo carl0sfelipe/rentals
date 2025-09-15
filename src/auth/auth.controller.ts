@@ -28,6 +28,29 @@ export class LoginRequestDto implements LoginDto {
 export class AuthController {
   constructor(@Inject(AuthService) private readonly authService: AuthService) {}
 
+  @Post('debug-prisma')
+  async debugPrisma(@Body() body: any) {
+    const { PrismaService } = await import('../prisma/prisma.service');
+    const prisma = new PrismaService();
+    await prisma.onModuleInit();
+    
+    console.log('DEBUG: Testing direct Prisma call');
+    try {
+      const user = await prisma.user.create({
+        data: { 
+          email: 'debug@test.com', 
+          password: 'hashedpassword', 
+          name: 'Debug User' 
+        }
+      });
+      console.log('DEBUG: User created successfully:', user);
+      return { success: true, user };
+    } catch (error: any) {
+      console.log('DEBUG: Error creating user:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
   @Post('register')
   async register(@Body() body: any) {
     const dto = plainToClass(RegisterRequestDto, body);

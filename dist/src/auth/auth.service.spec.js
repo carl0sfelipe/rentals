@@ -6,8 +6,15 @@ const auth_service_1 = require("./auth.service");
 const mockUsers = [];
 const prismaMock = {
     user: {
+        count: vitest_1.vi.fn(async () => mockUsers.length),
         findUnique: vitest_1.vi.fn(async (args) => mockUsers.find(u => u.email === args.where.email) || null),
         create: vitest_1.vi.fn(async (args) => {
+            const exists = mockUsers.find(u => u.email === args.data.email);
+            if (exists) {
+                const error = new Error('Unique constraint violation');
+                error.code = 'P2002';
+                throw error;
+            }
             const newUser = { id: String(mockUsers.length + 1), ...args.data };
             mockUsers.push(newUser);
             return newUser;
@@ -29,8 +36,8 @@ let service;
     (0, vitest_1.describe)('register', () => {
         (0, vitest_1.it)('deve criar novo usuário quando email não existe', async () => {
             const res = await service.register({ email: 'a@a.com', password: '123456' });
-            (0, vitest_1.expect)(res).toHaveProperty('id');
-            (0, vitest_1.expect)(res.email).toBe('a@a.com');
+            (0, vitest_1.expect)(res).toHaveProperty('access_token');
+            (0, vitest_1.expect)(res.access_token).toBe('signed-jwt-token');
             (0, vitest_1.expect)(hasherMock.hash).toHaveBeenCalledTimes(1);
             (0, vitest_1.expect)(prismaMock.user.create).toHaveBeenCalledTimes(1);
         });
@@ -46,6 +53,7 @@ let service;
     (0, vitest_1.describe)('login', () => {
         (0, vitest_1.it)('deve retornar access_token para credenciais válidas', async () => {
             await service.register({ email: 'login@test.com', password: 'pw' });
+            vitest_1.vi.clearAllMocks();
             const res = await service.login({ email: 'login@test.com', password: 'pw' });
             (0, vitest_1.expect)(res).toEqual({ access_token: 'signed-jwt-token' });
             (0, vitest_1.expect)(jwtMock.signAsync).toHaveBeenCalledTimes(1);

@@ -18,12 +18,15 @@ export declare class PBKDF2Hasher implements PasswordHasher {
     compare(plain: string, stored: string): Promise<boolean>;
 }
 export declare class AuthService {
-    private prisma;
-    private jwt;
-    private hasher;
+    private readonly prisma;
+    private readonly jwt;
+    private readonly hasher;
     constructor(prisma: PrismaService, jwt: JwtService, hasher: PasswordHasher);
     register(dto: RegisterDto): Promise<{
         access_token: string;
+        id: string;
+        email: string;
+        name: string;
     }>;
     login(dto: LoginDto): Promise<{
         access_token: string;
