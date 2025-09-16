@@ -1,7 +1,7 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 // API helper function
-const publishAd = async (propertyId) => {
+const publishAd = async (propertyId, scarcityPreferences) => {
   const token = localStorage.getItem('authToken');
   if (!token) {
     throw new Error('Usuário não autenticado');
@@ -15,11 +15,37 @@ const publishAd = async (propertyId) => {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${token}`,
     },
+    body: JSON.stringify(scarcityPreferences || {}),
   });
 
   if (!response.ok) {
     const error = await response.json();
     throw new Error(error.message || 'Erro ao publicar anúncio');
+  }
+
+  return response.json();
+};
+
+// API helper function for unpublishing
+const unpublishAd = async (propertyId) => {
+  const token = localStorage.getItem('authToken');
+  if (!token) {
+    throw new Error('Usuário não autenticado');
+  }
+
+  // Usar URL absoluta baseada na configuração do ambiente
+  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+  const response = await fetch(`${apiUrl}/properties/${propertyId}/unpublish`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Erro ao despublicar anúncio');
   }
 
   return response.json();
@@ -425,12 +451,24 @@ function VerticalInfiniteDateRangePicker({
 
 // ============================= Página =============================
 
-export default function VacationRentalLanding({ property, onClose }) {
+export default function VacationRentalLanding({ property, onClose, isPreview = false }) {
   const [dateRange, setDateRange] = useState({ start: null, end: null });
   const [guests, setGuests] = useState(2);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [viewCount, setViewCount] = useState(127);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [isUnpublishing, setIsUnpublishing] = useState(false);
+  const [publishedUrl, setPublishedUrl] = useState(null);
+
+  // Preview mode toggles for scarcity components
+  const [showCountdown, setShowCountdown] = useState(true);
+  const [showHighDemand, setShowHighDemand] = useState(true);
+  const [showViewCount, setShowViewCount] = useState(true);
+
+  // Use property preferences for published mode, or local state for preview mode
+  const effectiveShowCountdown = isPreview ? showCountdown : (property?.showCountdown ?? true);
+  const effectiveShowHighDemand = isPreview ? showHighDemand : (property?.showHighDemand ?? true);
+  const effectiveShowViewCount = isPreview ? showViewCount : (property?.showViewCount ?? true);
 
   // Usar dados da propriedade dinâmica
   const basePrice = property?.pricePerNight || 420;
@@ -444,6 +482,37 @@ export default function VacationRentalLanding({ property, onClose }) {
     "https://images.unsplash.com/photo-1582268611958-ebfd161ef9cf?w=1200&h=900&fit=crop",
     "https://images.unsplash.com/photo-1520637836862-4d197d17c55a?w=1200&h=900&fit=crop",
   ];
+
+  // Verificar se a propriedade já foi publicada ao montar o componente
+  useEffect(() => {
+    const checkPublicationStatus = async () => {
+      if (!property?.id) return;
+
+      try {
+        const token = localStorage.getItem('authToken');
+        if (!token) return;
+
+        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+        const response = await fetch(`${apiUrl}/properties/${property.id}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (response.ok) {
+          const propertyData = await response.json();
+          // Se a propriedade tem uma URL pública, significa que foi publicada
+          if (propertyData.publicUrl) {
+            setPublishedUrl(propertyData.publicUrl);
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao verificar status de publicação:', error);
+      }
+    };
+
+    checkPublicationStatus();
+  }, [property?.id]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -480,18 +549,48 @@ export default function VacationRentalLanding({ property, onClose }) {
 
     setIsPublishing(true);
     try {
-      const result = await publishAd(property.id);
+      // Send the current preview settings as scarcity preferences
+      const scarcityPreferences = {
+        showCountdown,
+        showHighDemand,
+        showViewCount
+      };
 
-      // Copiar URL para a área de transferência
+      const result = await publishAd(property.id, scarcityPreferences);
+
+      // Copiar URL para a área de transferência e definir URL publicada
       if (result.publicUrl) {
         navigator.clipboard.writeText(result.publicUrl);
-        alert(`✅ Anúncio publicado com sucesso!\n\nURL copiada: ${result.publicUrl}`);
+        setPublishedUrl(result.publicUrl);
       }
     } catch (error) {
       console.error('Erro ao publicar:', error);
       alert(`❌ Erro ao publicar anúncio: ${error.message}`);
     } finally {
       setIsPublishing(false);
+    }
+  };
+
+  const handleUnpublish = async () => {
+    if (!property?.id) {
+      alert('Erro: Propriedade não encontrada');
+      return;
+    }
+
+    if (!confirm('Tem certeza que deseja despublicar este anúncio? Ele não será mais acessível publicamente.')) {
+      return;
+    }
+
+    setIsUnpublishing(true);
+    try {
+      await unpublishAd(property.id);
+      setPublishedUrl(null);
+      alert('✅ Anúncio despublicado com sucesso!');
+    } catch (error) {
+      console.error('Erro ao despublicar:', error);
+      alert(`❌ Erro ao despublicar anúncio: ${error.message}`);
+    } finally {
+      setIsUnpublishing(false);
     }
   };
 
@@ -509,47 +608,120 @@ export default function VacationRentalLanding({ property, onClose }) {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="font-bold text-xl text-gray-900">{property?.title || 'OceanView Apt'}</div>
           <div className="flex items-center gap-3">
-            <div className="text-sm text-gray-700">
-              <Clock size={16} className="inline mr-1" />
-              <span className="animate-pulse">{viewCount} pessoas vendo agora</span>
-            </div>
+            {isPreview && effectiveShowViewCount && (
+              <div className="text-sm text-gray-700">
+                <Clock size={16} className="inline mr-1" />
+                <span className="animate-pulse">{viewCount} pessoas vendo agora</span>
+              </div>
+            )}
 
-            <button
-              onClick={handlePublish}
-              disabled={isPublishing}
-              className="bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center gap-2"
-            >
-              {isPublishing ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  Publicando...
-                </>
-              ) : (
-                <>
-                  🚀 Publicar
-                </>
-              )}
-            </button>
+            {isPreview && (publishedUrl ? (
+              <div className="flex items-center gap-2">
+                <a
+                  href={publishedUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center gap-2"
+                >
+                  ✅ Publicado
+                </a>
+                <button
+                  onClick={handleUnpublish}
+                  disabled={isUnpublishing}
+                  className="bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center gap-2"
+                >
+                  {isUnpublishing ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      Despublicando...
+                    </>
+                  ) : (
+                    <>
+                      🚫 Despublicar
+                    </>
+                  )}
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={handlePublish}
+                disabled={isPublishing}
+                className="bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center gap-2"
+              >
+                {isPublishing ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    Publicando...
+                  </>
+                ) : (
+                  <>
+                    🚀 Publicar
+                  </>
+                )}
+              </button>
+            ))}
 
-            <button
-              onClick={onClose}
-              className="bg-gray-600 hover:bg-gray-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
-            >
-              ✕ Fechar
-            </button>
+            {isPreview && (
+              <button
+                onClick={onClose}
+                className="bg-gray-600 hover:bg-gray-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+              >
+                ✕ Fechar
+              </button>
+            )}
           </div>
         </div>
       </nav>
 
-      {/* Promo strip */}
-      <div className="bg-blue-50 border-b border-blue-100">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-2 flex items-center justify-center gap-3 text-sm">
-          <Zap size={16} className="text-blue-600" />
-          <span className="text-blue-700">
-            Promoção termina em <b>{hh}:{mm}:{ss}</b>. Garanta o preço de hoje.
-          </span>
+      {/* Preview controls - only show in preview mode */}
+      {isPreview && (
+        <div className="bg-gray-50 border-b border-gray-200">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-3">
+            <div className="flex flex-wrap items-center gap-4 text-sm">
+              <span className="font-medium text-gray-700">Controles do Preview:</span>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={showCountdown}
+                  onChange={(e) => setShowCountdown(e.target.checked)}
+                  className="rounded border-gray-300"
+                />
+                <span>Mostrar countdown</span>
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={showHighDemand}
+                  onChange={(e) => setShowHighDemand(e.target.checked)}
+                  className="rounded border-gray-300"
+                />
+                <span>Mostrar alta demanda</span>
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={showViewCount}
+                  onChange={(e) => setShowViewCount(e.target.checked)}
+                  className="rounded border-gray-300"
+                />
+                <span>Mostrar contador de visualizações</span>
+              </label>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Promo strip - only show if enabled */}
+      {effectiveShowCountdown && (
+        <div className="bg-blue-50 border-b border-blue-100">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-2 flex items-center justify-center gap-3 text-sm">
+            <Zap size={16} className="text-blue-600" />
+            <span className="text-blue-700">
+              Promoção termina em <b>{hh}:{mm}:{ss}</b>. Garanta o preço de hoje.
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Hero */}
       <section className="pt-8 pb-8">
@@ -582,15 +754,18 @@ export default function VacationRentalLanding({ property, onClose }) {
               </div>
             </div>
 
-            <div className="mt-4 rounded-lg border border-red-200 bg-gradient-to-r from-red-50 to-orange-50 p-4">
-              <div className="flex items-center gap-2 text-red-700">
-                <TrendingUp size={16} />
-                <span className="font-semibold">Alta demanda nesta região</span>
+            {/* High demand message - only show if enabled */}
+            {effectiveShowHighDemand && (
+              <div className="mt-4 rounded-lg border border-red-200 bg-gradient-to-r from-red-50 to-orange-50 p-4">
+                <div className="flex items-center gap-2 text-red-700">
+                  <TrendingUp size={16} />
+                  <span className="font-semibold">Alta demanda nesta região</span>
+                </div>
+                <p className="text-sm text-red-700/90 mt-1">
+                  Apenas <b>3 datas</b> disponíveis este mês e mais de {Math.max(80, Math.floor(viewCount * 0.6))} pessoas interessadas hoje.
+                </p>
               </div>
-              <p className="text-sm text-red-700/90 mt-1">
-                Apenas <b>3 datas</b> disponíveis este mês e mais de {Math.max(80, Math.floor(viewCount * 0.6))} pessoas interessadas hoje.
-              </p>
-            </div>
+            )}
 
             <div className="mt-3 flex flex-wrap gap-3">
               <div className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
@@ -703,14 +878,16 @@ export default function VacationRentalLanding({ property, onClose }) {
 
       {/* Footer simples */}
       <footer className="border-t border-gray-100 py-8 text-center text-sm text-gray-500">
-        <div className="flex justify-center gap-4 mb-4">
-          <button
-            onClick={onClose}
-            className="bg-gray-600 hover:bg-gray-700 text-white font-medium py-2 px-6 rounded-lg transition-colors"
-          >
-            Fechar Anúncio
-          </button>
-        </div>
+        {isPreview && (
+          <div className="flex justify-center gap-4 mb-4">
+            <button
+              onClick={onClose}
+              className="bg-gray-600 hover:bg-gray-700 text-white font-medium py-2 px-6 rounded-lg transition-colors"
+            >
+              Fechar Anúncio
+            </button>
+          </div>
+        )}
         © {new Date().getFullYear()} {property?.title || 'OceanView Apt'} — Todos os direitos reservados
       </footer>
     </div>

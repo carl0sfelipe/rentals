@@ -60,9 +60,9 @@ export class PropertiesController {
 
   @Post(':id/publish')
   @UseGuards(JwtAuthGuard)
-  async publishAd(@Req() req: any, @Param('id') id: string) {
+  async publishAd(@Req() req: any, @Param('id') id: string, @Body() scarcityPreferences: any) {
     try {
-      const result = await this.propertiesService.publishAd(req.user.id, id);
+      const result = await this.propertiesService.publishAd(req.user.id, id, scarcityPreferences);
       return { success: true, publicUrl: result.publicUrl, message: 'Anúncio publicado com sucesso!' };
     } catch (error: any) {
       if (error.message === 'Property not found') {
@@ -72,6 +72,23 @@ export class PropertiesController {
         throw new HttpException('Acesso negado', HttpStatus.FORBIDDEN);
       }
       throw new HttpException('Erro ao publicar anúncio', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  @Post(':id/unpublish')
+  @UseGuards(JwtAuthGuard)
+  async unpublishAd(@Req() req: any, @Param('id') id: string) {
+    try {
+      const result = await this.propertiesService.unpublishAd(req.user.id, id);
+      return { success: true, message: 'Anúncio despublicado com sucesso!' };
+    } catch (error: any) {
+      if (error.message === 'Property not found') {
+        throw new HttpException('Propriedade não encontrada', HttpStatus.NOT_FOUND);
+      }
+      if (error.message === 'Access denied') {
+        throw new HttpException('Acesso negado', HttpStatus.FORBIDDEN);
+      }
+      throw new HttpException('Erro ao despublicar anúncio', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 

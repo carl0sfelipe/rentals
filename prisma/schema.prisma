@@ -72,6 +72,13 @@ model Property {
   bedrooms      Int
   bathrooms     Int
   imageUrl      String?
+  publicUrl     String?  // URL pública para anúncios publicados
+
+  // Scarcity element preferences for published ads
+  showCountdown   Boolean @default(true)
+  showHighDemand  Boolean @default(true)
+  showViewCount   Boolean @default(true)
+
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 

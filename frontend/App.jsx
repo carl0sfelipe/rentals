@@ -1920,6 +1920,7 @@ const DashboardPage = ({ user, activeOrganizationId, onLogout }) => {
                 setShowProfessionalAd(false);
                 setSelectedProperty(null);
               }}
+              isPreview={true}
             />
           )}
         </div>
@@ -2091,6 +2092,7 @@ const App = () => {
               setSelectedProperty(null);
               setPage('login');
             }}
+            isPreview={false}
           />
         )}
       </div>

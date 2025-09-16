@@ -165,7 +165,7 @@ export class PropertiesService {
     return `${year}${month}${day}T${hours}${minutes}${seconds}Z`;
   }
 
-  async publishAd(userId: string, propertyId: string) {
+  async publishAd(userId: string, propertyId: string, scarcityPreferences?: { showCountdown: boolean; showHighDemand: boolean; showViewCount: boolean }) {
     // Verificar se a propriedade existe e se o usuário tem acesso
     const property = await this.prisma.property.findUnique({
       where: { id: propertyId }
@@ -185,18 +185,38 @@ export class PropertiesService {
     // Gerar URL pública (ajuste conforme seu domínio)
     const publicUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/public/${slug}`;
 
+    // Preparar dados para atualização
+    const updateData: any = { publicUrl };
+
+    // Se foram fornecidas preferências de escassez, salvar elas
+    if (scarcityPreferences) {
+      updateData.showCountdown = scarcityPreferences.showCountdown;
+      updateData.showHighDemand = scarcityPreferences.showHighDemand;
+      updateData.showViewCount = scarcityPreferences.showViewCount;
+    }
+
+    // Salvar a URL pública e preferências no banco de dados
+    const updatedProperty = await this.prisma.property.update({
+      where: { id: propertyId },
+      data: updateData
+    });
+
     return {
       publicUrl,
       slug,
       property: {
-        id: property.id,
-        title: property.title,
-        description: property.description,
-        address: property.address,
-        pricePerNight: property.pricePerNight,
-        bedrooms: property.bedrooms,
-        bathrooms: property.bathrooms,
-        imageUrl: property.imageUrl
+        id: updatedProperty.id,
+        title: updatedProperty.title,
+        description: updatedProperty.description,
+        address: updatedProperty.address,
+        pricePerNight: updatedProperty.pricePerNight,
+        bedrooms: updatedProperty.bedrooms,
+        bathrooms: updatedProperty.bathrooms,
+        imageUrl: updatedProperty.imageUrl,
+        publicUrl: updatedProperty.publicUrl,
+        showCountdown: updatedProperty.showCountdown,
+        showHighDemand: updatedProperty.showHighDemand,
+        showViewCount: updatedProperty.showViewCount
       }
     };
   }
@@ -222,7 +242,45 @@ export class PropertiesService {
       bedrooms: property.bedrooms,
       bathrooms: property.bathrooms,
       imageUrl: property.imageUrl,
+      showCountdown: property.showCountdown,
+      showHighDemand: property.showHighDemand,
+      showViewCount: property.showViewCount,
       publishedAt: property.createdAt // Usar createdAt como publishedAt
+    };
+  }
+
+  async unpublishAd(userId: string, propertyId: string) {
+    // Verificar se a propriedade existe e se o usuário tem acesso
+    const property = await this.prisma.property.findUnique({
+      where: { id: propertyId }
+    });
+
+    if (!property) {
+      throw new Error('Property not found');
+    }
+
+    if (property.userId !== userId) {
+      throw new Error('Access denied');
+    }
+
+    // Remover a URL pública (despublicar)
+    const updatedProperty = await this.prisma.property.update({
+      where: { id: propertyId },
+      data: { publicUrl: null }
+    });
+
+    return {
+      property: {
+        id: updatedProperty.id,
+        title: updatedProperty.title,
+        description: updatedProperty.description,
+        address: updatedProperty.address,
+        pricePerNight: updatedProperty.pricePerNight,
+        bedrooms: updatedProperty.bedrooms,
+        bathrooms: updatedProperty.bathrooms,
+        imageUrl: updatedProperty.imageUrl,
+        publicUrl: updatedProperty.publicUrl
+      }
     };
   }
 
