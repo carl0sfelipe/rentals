@@ -1,0 +1,195 @@
+# docker-compose.production.yml
+# Stack de produção para Digital Ocean: 3 backends (dev, test, prod) + 3 bancos de dados
+# Uso: docker-compose -f docker-compose.production.yml up -d
+
+version: '3.8'
+
+services:
+  # ============================================================================
+  # BACKEND - DESENVOLVIMENTO
+  # ============================================================================
+  api-dev:
+    container_name: rentals_api_dev
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - DATABASE_URL=postgresql://rentals_user:rentals_pass@db-dev:5432/rentals_dev
+      - JWT_SECRET=${JWT_SECRET_DEV}
+      - FRONTEND_URL=${FRONTEND_URL_DEV}
+    depends_on:
+      db-dev:
+        condition: service_healthy
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ============================================================================
+  # BACKEND - TEST
+  # ============================================================================
+  api-test:
+    container_name: rentals_api_test
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    ports:
+      - "3001:3000"
+    environment:
+      - NODE_ENV=test
+      - PORT=3000
+      - DATABASE_URL=postgresql://rentals_user:rentals_pass@db-test:5432/rentals_test
+      - JWT_SECRET=${JWT_SECRET_TEST}
+      - FRONTEND_URL=${FRONTEND_URL_TEST}
+    depends_on:
+      db-test:
+        condition: service_healthy
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ============================================================================
+  # BACKEND - PRODUCTION
+  # ============================================================================
+  api-prod:
+    container_name: rentals_api_prod
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    ports:
+      - "3002:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATABASE_URL=postgresql://rentals_user:rentals_pass@db-prod:5432/rentals_prod
+      - JWT_SECRET=${JWT_SECRET_PROD}
+      - FRONTEND_URL=${FRONTEND_URL_PROD}
+    depends_on:
+      db-prod:
+        condition: service_healthy
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ============================================================================
+  # DATABASE - DESENVOLVIMENTO
+  # ============================================================================
+  db-dev:
+    container_name: rentals_db_dev_prod
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=rentals_user
+      - POSTGRES_PASSWORD=rentals_pass
+      - POSTGRES_DB=rentals_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata_dev:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rentals_user -d rentals_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: always
+
+  # ============================================================================
+  # DATABASE - TEST
+  # ============================================================================
+  db-test:
+    container_name: rentals_db_test_prod
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=rentals_user
+      - POSTGRES_PASSWORD=rentals_pass
+      - POSTGRES_DB=rentals_test
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata_test:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rentals_user -d rentals_test"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: always
+
+  # ============================================================================
+  # DATABASE - PRODUCTION
+  # ============================================================================
+  db-prod:
+    container_name: rentals_db_prod
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=rentals_user
+      - POSTGRES_PASSWORD=rentals_pass
+      - POSTGRES_DB=rentals_prod
+    ports:
+      - "5434:5432"
+    volumes:
+      - pgdata_prod:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rentals_user -d rentals_prod"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: always
+
+  # ============================================================================
+  # NGINX - REVERSE PROXY
+  # ============================================================================
+  nginx:
+    container_name: rentals_nginx
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - api-dev
+      - api-test
+      - api-prod
+    restart: always
+
+volumes:
+  pgdata_dev:
+    driver: local
+  pgdata_test:
+    driver: local
+  pgdata_prod:
+    driver: local
+
+# ============================================================================
+# CONFIGURAÇÃO
+# ============================================================================
+# URLs de acesso:
+# - DEV:  http://seu-ip:3000  ou  http://dev.seu-dominio.com
+# - TEST: http://seu-ip:3001  ou  http://test.seu-dominio.com
+# - PROD: http://seu-ip:3002  ou  http://seu-dominio.com
+#
+# Bancos de dados:
+# - DEV:  localhost:5432
+# - TEST: localhost:5433
+# - PROD: localhost:5434
