@@ -319,17 +319,37 @@ function VerticalInfiniteDateRangePicker({
 
   const renderWeekView = () => {
     const weeks = [];
-    const totalWeeks = 12; // 3 meses de semanas
-
-    for (let weekIndex = 0; weekIndex < totalWeeks; weekIndex++) {
-      const weekStart = addDays(currentWeekStart, weekIndex * 7);
+    const maxDate = addDays(TODAY, 365);
+    let weekStart = toStartOfDay(currentWeekStart);
+    // Garante que o início nunca é antes de hoje
+    if (weekStart < TODAY) weekStart = TODAY;
+    let lastMonth = null;
+    // Renderiza até a última semana que contenha pelo menos um dia <= maxDate
+    for (let i = 0; i < 52; i++) {
+      // Se a semana inteira está depois do maxDate, pare
+      if (addDays(weekStart, 0) > maxDate) break;
+      const weekMonth = weekStart.getMonth();
+      const weekYear = weekStart.getFullYear();
       const weekDays = [];
-
+      // Adiciona título do mês se mudou de mês
+      if (lastMonth !== weekMonth) {
+        weeks.push(
+          <div key={`month-title-${weekYear}-${weekMonth}`} className="mb-2 mt-6">
+            <div className="text-lg font-semibold text-gray-800">
+              {weekStart.toLocaleDateString(locale, { month: "long", year: "numeric" })}
+            </div>
+          </div>
+        );
+        lastMonth = weekMonth;
+      }
       for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
         const date = addDays(weekStart, dayIndex);
+        if (date < TODAY || date > maxDate) {
+          weekDays.push(<div key={dayIndex} />);
+          continue;
+        }
         const selected = (!!checkIn && isSameDay(date, checkIn)) || (!!checkOut && isSameDay(date, checkOut));
         const disabled = date < TODAY;
-
         weekDays.push(
           <button
             key={dayIndex}
@@ -361,16 +381,15 @@ function VerticalInfiniteDateRangePicker({
           </button>
         );
       }
-
       weeks.push(
-        <div key={weekIndex} className="mb-4">
+        <div key={weekStart.toISOString()} className="mb-4">
           <div className="grid grid-cols-7 gap-2">
             {weekDays}
           </div>
         </div>
       );
+      weekStart = addDays(weekStart, 7);
     }
-
     return (
       <div className="p-4">
         {weeks}

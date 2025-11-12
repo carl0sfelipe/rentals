@@ -1134,7 +1134,7 @@ const LoginPage = ({ onLogin }) => {
         <div className="text-center">
           <p className="text-xs text-gray-500">
             Conectado ao backend real em localhost:3000<br/>
-            <strong>Teste:</strong> admin@test.com / 12345678
+            <strong>Teste:</strong> admin@rentals.com / 12345678
           </p>
         </div>
       </div>
