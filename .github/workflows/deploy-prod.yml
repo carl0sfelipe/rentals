@@ -1,0 +1,47 @@
+name: Deploy PROD Environment
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch: # Permite executar manualmente
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to Digital Ocean PROD
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.DIGITALOCEAN_HOST }}
+          username: ${{ secrets.DIGITALOCEAN_USERNAME }}
+          key: ${{ secrets.DIGITALOCEAN_SSH_KEY }}
+          port: ${{ secrets.DIGITALOCEAN_PORT }}
+          script: |
+            cd /var/www/rentals
+            git fetch origin
+            git checkout main
+            git pull origin main
+
+            # Rebuild e restart apenas o ambiente PROD
+            docker compose -f docker-compose.production.yml build api-prod
+            docker compose -f docker-compose.production.yml up -d db-prod
+            sleep 5
+            docker compose -f docker-compose.production.yml up -d api-prod
+
+            # Executar migrations
+            docker compose -f docker-compose.production.yml exec -T api-prod npx prisma migrate deploy
+
+            # Verificar saúde
+            sleep 3
+            curl -f http://localhost:3002/health || echo "Warning: API PROD may not be responding"
+
+            echo "✅ Deploy PROD concluído!"
+
+      - name: Notify deployment
+        if: success()
+        run: echo "🚀 PROD environment deployed successfully!"
