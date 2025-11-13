@@ -7,30 +7,37 @@ set -e
 echo "🔍 Diagnóstico do erro 503..."
 echo ""
 
-# Verificar se docker-compose está instalado
-if ! command -v docker-compose &> /dev/null; then
-    echo "❌ docker-compose não encontrado!"
-    echo "Instale com: sudo apt install docker-compose"
+# Detectar se é docker-compose (V1) ou docker compose (V2)
+if command -v docker-compose &> /dev/null; then
+    DOCKER_COMPOSE="docker-compose"
+    echo "✅ Usando docker-compose (V1)"
+elif docker compose version &> /dev/null; then
+    DOCKER_COMPOSE="docker compose"
+    echo "✅ Usando docker compose (V2)"
+else
+    echo "❌ Docker Compose não encontrado!"
+    echo "Instale com: sudo apt install docker-compose-plugin"
     exit 1
 fi
 
+echo ""
 echo "1️⃣ Verificando status dos containers..."
-docker-compose -f docker-compose.production.yml ps
+$DOCKER_COMPOSE -f docker-compose.production.yml ps
 
 echo ""
 echo "2️⃣ Verificando logs do backend (api-prod)..."
 echo "Últimas 30 linhas:"
-docker-compose -f docker-compose.production.yml logs --tail=30 api-prod
+$DOCKER_COMPOSE -f docker-compose.production.yml logs --tail=30 api-prod
 
 echo ""
 echo "3️⃣ Verificando logs do nginx..."
 echo "Últimas 20 linhas:"
-docker-compose -f docker-compose.production.yml logs --tail=20 nginx
+$DOCKER_COMPOSE -f docker-compose.production.yml logs --tail=20 nginx
 
 echo ""
 echo "4️⃣ Verificando conectividade interna..."
 # Testar se o nginx consegue acessar o backend
-docker-compose -f docker-compose.production.yml exec -T nginx wget -q -O- http://api-prod:3000 || echo "❌ Nginx não consegue acessar api-prod:3000"
+$DOCKER_COMPOSE -f docker-compose.production.yml exec -T nginx wget -q -O- http://api-prod:3000 || echo "❌ Nginx não consegue acessar api-prod:3000"
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -42,7 +49,7 @@ echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
     echo ""
     echo "🔄 Reiniciando containers..."
-    docker-compose -f docker-compose.production.yml restart api-prod
+    $DOCKER_COMPOSE -f docker-compose.production.yml restart api-prod
 
     echo "⏳ Aguardando 10 segundos..."
     sleep 10
@@ -53,7 +60,7 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
 
     echo ""
     echo "📋 Status atual:"
-    docker-compose -f docker-compose.production.yml ps
+    $DOCKER_COMPOSE -f docker-compose.production.yml ps
 fi
 
 echo ""
@@ -62,14 +69,14 @@ echo "📝 COMANDOS ÚTEIS:"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 echo "# Ver logs em tempo real:"
-echo "docker-compose -f docker-compose.production.yml logs -f api-prod"
+echo "$DOCKER_COMPOSE -f docker-compose.production.yml logs -f api-prod"
 echo ""
 echo "# Reiniciar apenas o backend:"
-echo "docker-compose -f docker-compose.production.yml restart api-prod"
+echo "$DOCKER_COMPOSE -f docker-compose.production.yml restart api-prod"
 echo ""
 echo "# Rebuild completo:"
-echo "docker-compose -f docker-compose.production.yml up -d --build api-prod"
+echo "$DOCKER_COMPOSE -f docker-compose.production.yml up -d --build api-prod"
 echo ""
 echo "# Verificar variáveis de ambiente:"
-echo "docker-compose -f docker-compose.production.yml exec api-prod env | grep -E 'DATABASE_URL|FRONTEND_URL|NODE_ENV'"
+echo "$DOCKER_COMPOSE -f docker-compose.production.yml exec api-prod env | grep -E 'DATABASE_URL|FRONTEND_URL|NODE_ENV'"
 echo ""
