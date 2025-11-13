@@ -78,6 +78,7 @@ services:
       - DATABASE_URL=postgresql://rentals_user:rentals_pass@db-prod:5432/rentals_prod
       - JWT_SECRET=${JWT_SECRET_PROD}
       - FRONTEND_URL=${FRONTEND_URL_PROD}
+      - CORS_ORIGINS=${CORS_ORIGINS_PROD:-https://rentals-amber.vercel.app}
     depends_on:
       db-prod:
         condition: service_healthy
