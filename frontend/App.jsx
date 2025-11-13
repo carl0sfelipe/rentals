@@ -11,7 +11,7 @@ let CONFIG_LOADED = false;
 // Função para carregar configuração do backend
 const loadConfig = async () => {
   try {
-    const apiUrl = import.meta.env.VITE_API_URL || `${API_BASE_URL}';
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
     const response = await fetch(`${apiUrl}/config/feature-flags`);
     if (response.ok) {
       const config = await response.json();
@@ -45,7 +45,7 @@ const useAuth = () => {
 // ============================================================================
 // UTILITÁRIOS E CONFIGURAÇÕES
 // ============================================================================
-const API_BASE_URL = import.meta.env.VITE_API_URL || `${API_BASE_URL}';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 // ============================================================================
 // FUNÇÕES DE API (CONECTADAS AO BACKEND REAL)
@@ -1793,7 +1793,7 @@ const DashboardPage = ({ user, activeOrganizationId, onLogout }) => {
   // Handle anúncio público (para visitantes)
   const handlePublicAd = async (slug) => {
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || `${API_BASE_URL}';
+      const apiUrl = import.meta.env.VITE_API_URL || API_BASE_URL;
       const response = await fetch(`${apiUrl}/properties/public/${slug}`);
 
       if (!response.ok) {
@@ -1944,7 +1944,7 @@ const App = () => {
   // Handle anúncio público (para visitantes)
   const handlePublicAd = async (slug) => {
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || `${API_BASE_URL}';
+      const apiUrl = import.meta.env.VITE_API_URL || API_BASE_URL;
       const response = await fetch(`${apiUrl}/properties/public/${slug}`);
 
       if (!response.ok) {
