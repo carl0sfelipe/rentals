@@ -3,7 +3,7 @@
 ## 📋 Configuração do Seu Ambiente
 
 - **IP do Droplet:** 45.55.95.48
-- **Domínio (nip.io):** dev-3000-45-55-95-48.nip.io
+- **Domínio (sslip.io):** dev-3000-45-55-95-48.sslip.io
 - **Front-end Vercel:** https://rentals-dev-zeta.vercel.app
 - **Backend Porta:** 3000
 
@@ -24,7 +24,7 @@ Erro atual:
 ✅ HTTPS (Vercel) → HTTPS (Nginx) → HTTP (localhost:3000)
 
 Após configurar:
-https://rentals-dev-zeta.vercel.app → https://dev-3000-45-55-95-48.nip.io → http://localhost:3000
+https://rentals-dev-zeta.vercel.app → https://dev-3000-45-55-95-48.sslip.io → http://localhost:3000
 ```
 
 ---
@@ -81,7 +81,7 @@ No seu código do front-end (Vercel), mude a URL da API de:
 const API_URL = "http://45.55.95.48:3000"
 
 // ✅ DEPOIS (HTTPS - funciona!)
-const API_URL = "https://dev-3000-45-55-95-48.nip.io"
+const API_URL = "https://dev-3000-45-55-95-48.sslip.io"
 ```
 
 **Onde encontrar?** Provavelmente em:
@@ -97,10 +97,10 @@ const API_URL = "https://dev-3000-45-55-95-48.nip.io"
 
 ```bash
 # Verificar HTTP → HTTPS redirect
-curl -I http://dev-3000-45-55-95-48.nip.io
+curl -I http://dev-3000-45-55-95-48.sslip.io
 
 # Verificar HTTPS funcionando
-curl -I https://dev-3000-45-55-95-48.nip.io
+curl -I https://dev-3000-45-55-95-48.sslip.io
 
 # Verificar backend local
 curl http://localhost:3000
@@ -110,7 +110,7 @@ curl http://localhost:3000
 
 Abra no navegador:
 ```
-https://dev-3000-45-55-95-48.nip.io
+https://dev-3000-45-55-95-48.sslip.io
 ```
 
 Você deve ver:
@@ -159,10 +159,10 @@ sudo systemctl restart nginx
 
 ```bash
 # Tentar novamente manualmente
-sudo certbot --nginx -d dev-3000-45-55-95-48.nip.io
+sudo certbot --nginx -d dev-3000-45-55-95-48.sslip.io
 
 # Ver logs detalhados
-sudo certbot --nginx -d dev-3000-45-55-95-48.nip.io --verbose
+sudo certbot --nginx -d dev-3000-45-55-95-48.sslip.io --verbose
 ```
 
 ### CORS ainda bloqueado?
@@ -216,7 +216,7 @@ sudo ufw status verbose
 Depois de completar:
 
 ✅ **API acessível via HTTPS:**
-   https://dev-3000-45-55-95-48.nip.io
+   https://dev-3000-45-55-95-48.sslip.io
 
 ✅ **Cadeado verde no navegador** 🔒
 
@@ -236,7 +236,7 @@ Quando quiser um domínio próprio:
 
 1. Compre um domínio (ex: meusite.com)
 2. Configure DNS: `dev.api.meusite.com → 45.55.95.48`
-3. Edite `/etc/nginx/sites-available/dev-api` trocando `dev-3000-45-55-95-48.nip.io` por `dev.api.meusite.com`
+3. Edite `/etc/nginx/sites-available/dev-api` trocando `dev-3000-45-55-95-48.sslip.io` por `dev.api.meusite.com`
 4. Execute: `sudo certbot --nginx -d dev.api.meusite.com`
 5. Pronto! Domínio profissional com HTTPS 🚀
 
@@ -271,7 +271,7 @@ Se encontrar problemas:
 - [ ] Firewall configurado (`sudo ufw status`)
 - [ ] Certificado SSL obtido (`sudo certbot certificates`)
 - [ ] Backend respondendo (`curl http://localhost:3000`)
-- [ ] HTTPS funcionando (`curl https://dev-3000-45-55-95-48.nip.io`)
+- [ ] HTTPS funcionando (`curl https://dev-3000-45-55-95-48.sslip.io`)
 - [ ] URL atualizada no front-end
 - [ ] Deploy feito no Vercel
 - [ ] Teste completo no navegador (publicar anúncio)
