@@ -21,23 +21,18 @@ jobs:
           key: ${{ secrets.DIGITALOCEAN_SSH_KEY }}
           port: ${{ secrets.DIGITALOCEAN_PORT }}
           script: |
-            cd /var/www/rentals
+            cd ~/rentals
+
+            # Update code
             git fetch origin
             git checkout test
             git pull origin test
 
-            # Rebuild e restart apenas o ambiente TEST
-            docker compose -f docker-compose.production.yml build api-test
-            docker compose -f docker-compose.production.yml up -d db-test
-            sleep 5
-            docker compose -f docker-compose.production.yml up -d api-test
+            # Make deployment script executable
+            chmod +x deploy-update.sh
 
-            # Executar migrations
-            docker compose -f docker-compose.production.yml exec -T api-test npx prisma migrate deploy
-
-            # Verificar saúde
-            sleep 3
-            curl -f http://localhost:3001/health || echo "Warning: API TEST may not be responding"
+            # Run automated deployment script
+            ./deploy-update.sh test
 
             echo "✅ Deploy TEST concluído!"
 
