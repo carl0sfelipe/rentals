@@ -11,7 +11,7 @@ let CONFIG_LOADED = false;
 // Função para carregar configuração do backend
 const loadConfig = async () => {
   try {
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    const apiUrl = import.meta.env.VITE_API_URL || `${API_BASE_URL}';
     const response = await fetch(`${apiUrl}/config/feature-flags`);
     if (response.ok) {
       const config = await response.json();
@@ -45,7 +45,7 @@ const useAuth = () => {
 // ============================================================================
 // UTILITÁRIOS E CONFIGURAÇÕES
 // ============================================================================
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || `${API_BASE_URL}';
 
 // ============================================================================
 // FUNÇÕES DE API (CONECTADAS AO BACKEND REAL)
@@ -105,7 +105,7 @@ const apiService = {
   // Conecta ao backend real para login
   login: async (email, password) => {
     try {
-      const response = await fetch('http://localhost:3000/auth/login', {
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -142,7 +142,7 @@ const apiService = {
   // Registra novo usuário
   register: async (name, email, password) => {
     try {
-      const response = await fetch('http://localhost:3000/auth/register', {
+      const response = await fetch(`${API_BASE_URL}/auth/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -179,7 +179,7 @@ const apiService = {
   // Busca propriedades do usuário autenticado
   getProperties: async (token) => {
     try {
-      const response = await fetchWithAuth('http://localhost:3000/properties');
+      const response = await fetchWithAuth(`${API_BASE_URL}/properties');
       
       if (!response.ok) {
         throw new Error('Erro ao carregar propriedades');
@@ -287,7 +287,7 @@ const apiService = {
   // Cria uma nova propriedade
   createProperty: async (propertyData) => {
     try {
-      const response = await fetchWithAuth('http://localhost:3000/properties', {
+      const response = await fetchWithAuth(`${API_BASE_URL}/properties', {
         method: 'POST',
         body: JSON.stringify(propertyData),
       });
@@ -347,7 +347,7 @@ const apiService = {
   // Lista membros da organização
   getMembers: async () => {
     try {
-      const response = await fetchWithAuth('http://localhost:3000/organizations/members');
+      const response = await fetchWithAuth(`${API_BASE_URL}/organizations/members');
       
       if (!response.ok) {
         throw new Error('Erro ao carregar membros');
@@ -364,7 +364,7 @@ const apiService = {
   // Adiciona um membro à organização
   addMember: async (email, role) => {
     try {
-      const response = await fetchWithAuth('http://localhost:3000/organizations/members', {
+      const response = await fetchWithAuth(`${API_BASE_URL}/organizations/members', {
         method: 'POST',
         body: JSON.stringify({ email, role }),
       });
@@ -426,7 +426,7 @@ const apiService = {
   // Lista organizações do usuário
   getMyOrganizations: async () => {
     try {
-      const response = await fetchWithAuth('http://localhost:3000/organizations/members/my-organizations');
+      const response = await fetchWithAuth(`${API_BASE_URL}/organizations/members/my-organizations');
       
       if (!response.ok) {
         throw new Error('Erro ao carregar organizações');
@@ -778,7 +778,7 @@ const PropertyForm = ({ property, onSave, onCancel, loading }) => {
 
   const generateRandomImage = async () => {
     try {
-      const response = await fetch('http://localhost:3000/unsplash/random');
+      const response = await fetch(`${API_BASE_URL}/unsplash/random');
       const data = await response.json();
       setFormData({ ...formData, imageUrl: data.imageUrl });
       setImagePreview(data.imageUrl);
@@ -1686,7 +1686,7 @@ const DashboardPage = ({ user, activeOrganizationId, onLogout }) => {
   useEffect(() => {
     const loadConfig = async () => {
       try {
-        const response = await fetch('http://localhost:3000/config/feature-flags');
+        const response = await fetch(`${API_BASE_URL}/config/feature-flags');
         if (response.ok) {
           const config = await response.json();
           setMultiTenantEnabled(config.MULTI_TENANT_ENABLED);
@@ -1793,7 +1793,7 @@ const DashboardPage = ({ user, activeOrganizationId, onLogout }) => {
   // Handle anúncio público (para visitantes)
   const handlePublicAd = async (slug) => {
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      const apiUrl = import.meta.env.VITE_API_URL || `${API_BASE_URL}';
       const response = await fetch(`${apiUrl}/properties/public/${slug}`);
 
       if (!response.ok) {
@@ -1944,7 +1944,7 @@ const App = () => {
   // Handle anúncio público (para visitantes)
   const handlePublicAd = async (slug) => {
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      const apiUrl = import.meta.env.VITE_API_URL || `${API_BASE_URL}';
       const response = await fetch(`${apiUrl}/properties/public/${slug}`);
 
       if (!response.ok) {
