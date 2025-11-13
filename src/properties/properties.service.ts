@@ -208,7 +208,15 @@ export class PropertiesService {
       return 'http://localhost:5173';
     };
 
-    const publicUrl = `${getFrontendUrl()}/public/${slug}`;
+    const frontendUrl = getFrontendUrl();
+    const publicUrl = `${frontendUrl}/public/${slug}`;
+
+    // Log para debug
+    console.log('🔍 [DEBUG] Gerando URL pública:');
+    console.log('   - NODE_ENV:', process.env.NODE_ENV);
+    console.log('   - FRONTEND_URL:', process.env.FRONTEND_URL || '(não definida)');
+    console.log('   - Frontend URL detectada:', frontendUrl);
+    console.log('   - URL pública gerada:', publicUrl);
 
     // Preparar dados para atualização
     const updateData: any = { publicUrl };
