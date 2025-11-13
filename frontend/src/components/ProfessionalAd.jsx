@@ -634,51 +634,55 @@ export default function VacationRentalLanding({ property, onClose, isPreview = f
               </div>
             )}
 
-            {isPreview && (publishedUrl ? (
-              <div className="flex items-center gap-2">
-                <a
-                  href={publishedUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center gap-2"
-                >
-                  ✅ Publicado
-                </a>
-                <button
-                  onClick={handleUnpublish}
-                  disabled={isUnpublishing}
-                  className="bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center gap-2"
-                >
-                  {isUnpublishing ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      Despublicando...
-                    </>
-                  ) : (
-                    <>
-                      🚫 Despublicar
-                    </>
-                  )}
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={handlePublish}
-                disabled={isPublishing}
-                className="bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center gap-2"
-              >
-                {isPublishing ? (
+            {isPreview && (
+              <div className="flex items-center gap-2" key="publish-controls">
+                {publishedUrl ? (
                   <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    Publicando...
+                    <a
+                      href={publishedUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center gap-2"
+                    >
+                      ✅ Publicado
+                    </a>
+                    <button
+                      onClick={handleUnpublish}
+                      disabled={isUnpublishing}
+                      className="bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center gap-2"
+                    >
+                      {isUnpublishing ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                          Despublicando...
+                        </>
+                      ) : (
+                        <>
+                          🚫 Despublicar
+                        </>
+                      )}
+                    </button>
                   </>
                 ) : (
-                  <>
-                    🚀 Publicar
-                  </>
+                  <button
+                    onClick={handlePublish}
+                    disabled={isPublishing}
+                    className="bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center gap-2"
+                  >
+                    {isPublishing ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        Publicando...
+                      </>
+                    ) : (
+                      <>
+                        🚀 Publicar
+                      </>
+                    )}
+                  </button>
                 )}
-              </button>
-            ))}
+              </div>
+            )}
 
             {isPreview && (
               <button
