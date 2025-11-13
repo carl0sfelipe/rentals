@@ -7,11 +7,11 @@
   "installCommand": "cd frontend && npm install",
   "framework": "vite",
   "env": {
-    "VITE_API_URL": "http://SEU_IP_DIGITAL_OCEAN:3000"
+    "VITE_API_URL": "https://dev-3000-45-55-95-48.sslip.io"
   },
   "build": {
     "env": {
-      "VITE_API_URL": "http://SEU_IP_DIGITAL_OCEAN:3000"
+      "VITE_API_URL": "https://dev-3000-45-55-95-48.sslip.io"
     }
   },
   "routes": [
