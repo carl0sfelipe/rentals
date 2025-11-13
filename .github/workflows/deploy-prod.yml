@@ -22,23 +22,18 @@ jobs:
           key: ${{ secrets.DIGITALOCEAN_SSH_KEY }}
           port: ${{ secrets.DIGITALOCEAN_PORT }}
           script: |
-            cd /var/www/rentals
+            cd ~/rentals
+
+            # Update code
             git fetch origin
             git checkout main
             git pull origin main
 
-            # Rebuild e restart apenas o ambiente PROD
-            docker compose -f docker-compose.production.yml build api-prod
-            docker compose -f docker-compose.production.yml up -d db-prod
-            sleep 5
-            docker compose -f docker-compose.production.yml up -d api-prod
+            # Make deployment script executable
+            chmod +x deploy-update.sh
 
-            # Executar migrations
-            docker compose -f docker-compose.production.yml exec -T api-prod npx prisma migrate deploy
-
-            # Verificar saúde
-            sleep 3
-            curl -f http://localhost:3002/health || echo "Warning: API PROD may not be responding"
+            # Run automated deployment script
+            ./deploy-update.sh prod
 
             echo "✅ Deploy PROD concluído!"
 
