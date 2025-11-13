@@ -182,8 +182,33 @@ export class PropertiesService {
     // Gerar slug único baseado no ID da propriedade (abordagem segura sem mudanças no schema)
     const slug = `ad-${propertyId}`;
 
-    // Gerar URL pública (ajuste conforme seu domínio)
-    const publicUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/public/${slug}`;
+    // Gerar URL pública baseada no ambiente
+    const getFrontendUrl = () => {
+      // Se FRONTEND_URL está definida, usa ela
+      if (process.env.FRONTEND_URL) {
+        return process.env.FRONTEND_URL;
+      }
+
+      // Caso contrário, detecta o ambiente e usa a URL correspondente
+      const nodeEnv = process.env.NODE_ENV || 'development';
+
+      if (nodeEnv === 'production' && process.env.FRONTEND_URL_PROD) {
+        return process.env.FRONTEND_URL_PROD;
+      }
+
+      if (nodeEnv === 'test' && process.env.FRONTEND_URL_TEST) {
+        return process.env.FRONTEND_URL_TEST;
+      }
+
+      if (nodeEnv === 'development' && process.env.FRONTEND_URL_DEV) {
+        return process.env.FRONTEND_URL_DEV;
+      }
+
+      // Fallback final para desenvolvimento local
+      return 'http://localhost:5173';
+    };
+
+    const publicUrl = `${getFrontendUrl()}/public/${slug}`;
 
     // Preparar dados para atualização
     const updateData: any = { publicUrl };
