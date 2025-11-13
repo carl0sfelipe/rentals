@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Script de Instalação Nginx + HTTPS para Ambiente Dev
-# Domain: dev-3000-45-55-95-48.nip.io
+# Domain: dev-3000-45-55-95-48.sslip.io
 # IP: 45.55.95.48
 # Backend Port: 3000
 
@@ -54,14 +54,14 @@ echo ""
 # 5. Criar configuração do Nginx
 echo "📝 Criando configuração do Nginx..."
 cat > /etc/nginx/sites-available/dev-api << 'EOF'
-# Nginx Configuration for Development Environment (nip.io)
-# Domain: dev-3000-45-55-95-48.nip.io → http://localhost:3000
+# Nginx Configuration for Development Environment (sslip.io)
+# Domain: dev-3000-45-55-95-48.sslip.io → http://localhost:3000
 
 # HTTP → HTTPS Redirect
 server {
     listen 80;
     listen [::]:80;
-    server_name dev-3000-45-55-95-48.nip.io;
+    server_name dev-3000-45-55-95-48.sslip.io;
 
     # Redirect all HTTP traffic to HTTPS
     return 301 https://$server_name$request_uri;
@@ -71,11 +71,11 @@ server {
 server {
     listen 443 ssl http2;
     listen [::]:443 ssl http2;
-    server_name dev-3000-45-55-95-48.nip.io;
+    server_name dev-3000-45-55-95-48.sslip.io;
 
     # SSL Certificate Configuration (will be managed by Certbot)
-    # ssl_certificate /etc/letsencrypt/live/dev-3000-45-55-95-48.nip.io/fullchain.pem;
-    # ssl_certificate_key /etc/letsencrypt/live/dev-3000-45-55-95-48.nip.io/privkey.pem;
+    # ssl_certificate /etc/letsencrypt/live/dev-3000-45-55-95-48.sslip.io/fullchain.pem;
+    # ssl_certificate_key /etc/letsencrypt/live/dev-3000-45-55-95-48.sslip.io/privkey.pem;
     # include /etc/letsencrypt/options-ssl-nginx.conf;
     # ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
 
@@ -179,10 +179,10 @@ echo "🔐 Obtendo certificado SSL com Let's Encrypt..."
 echo ""
 echo "⚠️  IMPORTANTE: Você precisará fornecer um e-mail válido."
 echo ""
-certbot --nginx -d dev-3000-45-55-95-48.nip.io --non-interactive --agree-tos --register-unsafely-without-email || {
+certbot --nginx -d dev-3000-45-55-95-48.sslip.io --non-interactive --agree-tos --register-unsafely-without-email || {
     echo ""
     echo "⚠️  Certbot automático falhou. Vamos tentar manualmente..."
-    echo "Execute: sudo certbot --nginx -d dev-3000-45-55-95-48.nip.io"
+    echo "Execute: sudo certbot --nginx -d dev-3000-45-55-95-48.sslip.io"
     exit 1
 }
 echo ""
@@ -200,7 +200,7 @@ echo "✅ INSTALAÇÃO CONCLUÍDA COM SUCESSO!"
 echo "=================================================="
 echo ""
 echo "🎉 Sua API agora está disponível em:"
-echo "   https://dev-3000-45-55-95-48.nip.io"
+echo "   https://dev-3000-45-55-95-48.sslip.io"
 echo ""
 echo "🔧 Configurações:"
 echo "   - Nginx rodando nas portas 80 e 443"
@@ -209,10 +209,10 @@ echo "   - SSL válido (Let's Encrypt)"
 echo "   - CORS configurado para: https://rentals-dev-zeta.vercel.app"
 echo ""
 echo "📝 Próximos passos:"
-echo "   1. Acesse: https://dev-3000-45-55-95-48.nip.io no navegador"
+echo "   1. Acesse: https://dev-3000-45-55-95-48.sslip.io no navegador"
 echo "   2. Verifique o cadeado verde 🔒"
 echo "   3. Atualize sua URL no front-end Vercel para:"
-echo "      https://dev-3000-45-55-95-48.nip.io"
+echo "      https://dev-3000-45-55-95-48.sslip.io"
 echo ""
 echo "🐛 Troubleshooting:"
 echo "   - Logs do Nginx: sudo tail -f /var/log/nginx/dev-api-error.log"
