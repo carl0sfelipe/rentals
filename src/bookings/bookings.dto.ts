@@ -1,4 +1,5 @@
-import { IsDateString, IsOptional, IsEnum, IsNotEmpty } from 'class-validator';
+import { IsDateString, IsOptional, IsEnum, IsNotEmpty, IsInt, IsString, IsArray } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class CreateBookingDto {
   @IsNotEmpty({ message: 'startDate is required' })
@@ -10,6 +11,19 @@ export class CreateBookingDto {
   endDate!: string;
 
   @IsOptional()
-  @IsEnum(['BLOCKED', 'RESERVATION'], { message: 'type must be either BLOCKED or RESERVATION' })
-  type?: 'BLOCKED' | 'RESERVATION';
+  @IsEnum(['BLOCKED', 'RESERVATION', 'MAINTENANCE'], { message: 'type must be valid' })
+  type?: 'BLOCKED' | 'RESERVATION' | 'MAINTENANCE';
+
+  @IsOptional()
+  @IsString()
+  observations?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Type(() => Number)
+  guestCount?: number;
+
+  @IsOptional()
+  @IsArray()
+  guestsDetail?: any[];
 }

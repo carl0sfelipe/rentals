@@ -1,13 +1,13 @@
 import { Module } from '@nestjs/common';
-import { CalendarSyncService } from './calendar-sync.service';
-import { PrismaService } from '../prisma/prisma.service';
+import { CalendarService } from './calendar.service';
+import { CalendarController } from './calendar.controller';
+import { PrismaModule } from '../prisma/prisma.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
-  providers: [
-    PrismaService,
-    { provide: 'PrismaService', useExisting: PrismaService },
-    CalendarSyncService,
-  ],
-  exports: [CalendarSyncService],
+  imports: [PrismaModule, AuthModule],
+  controllers: [CalendarController],
+  providers: [CalendarService],
+  exports: [CalendarService],
 })
 export class CalendarModule {}

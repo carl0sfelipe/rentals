@@ -92,10 +92,14 @@ export class BookingsService {
         startDate,
         endDate,
         type: createBookingDto.type || 'BLOCKED',
+        observations: createBookingDto.observations || null,
+        guestCount: createBookingDto.guestCount !== undefined ? Number(createBookingDto.guestCount) : 0,
+        guestsDetail: createBookingDto.guestsDetail || [],
         propertyId: propertyId
       }
     });
 
+    console.log('✅ Booking created successfully:', JSON.stringify(booking, null, 2));
     return booking;
   }
 
@@ -195,7 +199,10 @@ export class BookingsService {
       data: {
         startDate,
         endDate,
-        type: updateBookingDto.type || booking.type
+        type: updateBookingDto.type || booking.type,
+        observations: updateBookingDto.observations !== undefined ? updateBookingDto.observations : booking.observations,
+        guestCount: updateBookingDto.guestCount !== undefined ? Number(updateBookingDto.guestCount) : Number(booking.guestCount),
+        guestsDetail: updateBookingDto.guestsDetail !== undefined ? updateBookingDto.guestsDetail : booking.guestsDetail,
       }
     });
 

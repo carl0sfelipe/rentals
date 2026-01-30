@@ -1,5 +1,6 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import ProfessionalAd from './src/components/ProfessionalAd';
+import { MasterCalendar } from './src/components/calendar/MasterCalendar';
 
 // ============================================================================
 // FEATURE FLAGS (CONFIGURAÇÃO ÚNICA)
@@ -202,6 +203,9 @@ const apiService = {
           startDate: bookingData.startDate,
           endDate: bookingData.endDate,
           type: bookingData.type,
+          observations: bookingData.observations,
+          guestCount: bookingData.guestCount,
+          guestsDetail: bookingData.guestsDetail,
         }),
       });
 
@@ -247,6 +251,9 @@ const apiService = {
           startDate: bookingData.startDate,
           endDate: bookingData.endDate,
           type: bookingData.type,
+          observations: bookingData.observations,
+          guestCount: bookingData.guestCount,
+          guestsDetail: bookingData.guestsDetail,
         }),
       });
 
@@ -1151,20 +1158,89 @@ const PropertyCard = ({ property, onCreateBooking, onEdit, onDelete, onViewProfe
   const [bookingData, setBookingData] = useState({
     startDate: '',
     endDate: '',
-    type: 'BLOCKED'
+    type: 'BLOCKED',
+    observations: '',
+    guestCount: 0,
+    guestsDetail: []
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const handleGuestDetailChange = (index, field, value) => {
+    console.log(`Updating guest ${index} field ${field} to ${value}`);
+    const newGuestsDetail = [...(bookingData.guestsDetail || [])];
+    if (!newGuestsDetail[index]) {
+      newGuestsDetail[index] = { name: '', cpf: '', whatsapp: '' };
+    }
+    newGuestsDetail[index][field] = value;
+    setBookingData(prev => ({ ...prev, guestsDetail: newGuestsDetail }));
+  };
+
+  const updateGuestCount = (count) => {
+    const newCount = parseInt(count);
+    if (isNaN(newCount) || newCount < 0) return;
+
+    setBookingData(prev => {
+      const currentDetails = prev.guestsDetail || [];
+      const newDetails = [...currentDetails];
+      
+      if (newCount > newDetails.length) {
+        for (let i = newDetails.length; i < newCount; i++) {
+          newDetails.push({ name: '', cpf: '', whatsapp: '' });
+        }
+      } else {
+        newDetails.splice(newCount);
+      }
+      
+      return { ...prev, guestCount: newCount, guestsDetail: newDetails };
+    });
+  };
+
+  const handleStartDateChange = (val) => {
+    if (!val) {
+      setBookingData({ ...bookingData, startDate: val });
+      return;
+    }
+    
+    // Quando a data de início muda, a data de fim deve segui-la automaticamente
+    // (mesma data, conforme solicitado)
+    setBookingData({ 
+      ...bookingData, 
+      startDate: val,
+      endDate: val 
+    });
+  };
 
   const handleBookingSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
 
+    // CRÍTICO: Garantir os valores atuais do formulário
+    const finalGuestCount = parseInt(bookingData.guestCount);
+    
+    const submissionData = {
+      startDate: bookingData.startDate,
+      endDate: bookingData.endDate,
+      type: bookingData.type,
+      observations: bookingData.observations,
+      guestCount: finalGuestCount,
+      guestsDetail: bookingData.guestsDetail.slice(0, finalGuestCount)
+    };
+
+    console.log('CLIQUE SALVAR - Enviando:', submissionData);
+
     try {
-      await onCreateBooking(property.id, bookingData);
+      await onCreateBooking(property.id, submissionData);
       setShowBookingForm(false);
-      setBookingData({ startDate: '', endDate: '', type: 'BLOCKED' });
+      setBookingData({ 
+        startDate: '', 
+        endDate: '', 
+        type: 'BLOCKED',
+        observations: '',
+        guestCount: 0,
+        guestsDetail: []
+      });
     } catch (err) {
       console.error('Erro ao criar bloqueio:', err);
       
@@ -1339,7 +1415,7 @@ const PropertyCard = ({ property, onCreateBooking, onEdit, onDelete, onViewProfe
                     type="date"
                     required
                     value={bookingData.startDate}
-                    onChange={(e) => setBookingData({ ...bookingData, startDate: e.target.value })}
+                    onChange={(e) => handleStartDateChange(e.target.value)}
                     className="w-full px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
                 </div>
@@ -1367,8 +1443,73 @@ const PropertyCard = ({ property, onCreateBooking, onEdit, onDelete, onViewProfe
                 >
                   <option value="BLOCKED">Bloqueado</option>
                   <option value="RESERVATION">Reserva</option>
+                  <option value="MAINTENANCE">Manutenção</option>
                 </select>
               </div>
+
+              {/* Campos Dinâmicos: Observações para Bloqueio/Manutenção */}
+              {(bookingData.type === 'BLOCKED' || bookingData.type === 'MAINTENANCE') && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Observações (ex: faxina, pintura)
+                  </label>
+                  <textarea
+                    value={bookingData.observations}
+                    onChange={(e) => setBookingData({ ...bookingData, observations: e.target.value })}
+                    className="w-full px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    rows={2}
+                    placeholder="O que será feito?"
+                  />
+                </div>
+              )}
+
+              {/* Campos Dinâmicos: Hóspedes para Reserva */}
+              {bookingData.type === 'RESERVATION' && (
+                <div className="space-y-3 p-3 bg-blue-50 rounded-lg border border-blue-100">
+                  <div>
+                    <label className="block text-xs font-bold text-blue-700 mb-1">
+                      Número de Hóspedes
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={bookingData.guestCount}
+                      onChange={(e) => updateGuestCount(e.target.value)}
+                      className="w-20 px-3 py-1 border border-blue-300 rounded-md text-sm focus:ring-blue-500"
+                    />
+                  </div>
+
+                  {bookingData.guestsDetail.map((guest, idx) => (
+                    <div key={idx} className="p-2 bg-white rounded border border-blue-200 space-y-2">
+                      <p className="text-[10px] font-bold text-gray-400 uppercase">Hóspede {idx + 1}</p>
+                      <input
+                        type="text"
+                        placeholder="Nome Completo"
+                        value={guest.name}
+                        onChange={(e) => handleGuestDetailChange(idx, 'name', e.target.value)}
+                        className="w-full px-2 py-1 text-xs border rounded"
+                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          type="text"
+                          placeholder="CPF"
+                          value={guest.cpf}
+                          onChange={(e) => handleGuestDetailChange(idx, 'cpf', e.target.value)}
+                          className="px-2 py-1 text-xs border rounded"
+                        />
+                        <input
+                          type="text"
+                          placeholder="WhatsApp"
+                          value={guest.whatsapp}
+                          onChange={(e) => handleGuestDetailChange(idx, 'whatsapp', e.target.value)}
+                          className="px-2 py-1 text-xs border rounded"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <div className="flex space-x-2">
                 <button
                   type="submit"
@@ -1677,6 +1818,7 @@ const DashboardPage = ({ user, activeOrganizationId, onLogout }) => {
   const [editingProperty, setEditingProperty] = useState(null);
   const [formLoading, setFormLoading] = useState(false);
   const [showMembersManagement, setShowMembersManagement] = useState(false);
+  const [showCalendar, setShowCalendar] = useState(false);
   const [showProfessionalAd, setShowProfessionalAd] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [multiTenantEnabled, setMultiTenantEnabled] = useState(false);
@@ -1827,6 +1969,12 @@ const DashboardPage = ({ user, activeOrganizationId, onLogout }) => {
               </div>
             </div>
             <div className="flex space-x-3">
+              <button
+                onClick={() => setShowCalendar(true)}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-md transition-colors"
+              >
+                📅 Calendário
+              </button>
               {multiTenantEnabled && (
                 <button
                   onClick={() => setShowMembersManagement(true)}
@@ -1910,6 +2058,31 @@ const DashboardPage = ({ user, activeOrganizationId, onLogout }) => {
           {/* Gerenciamento de Membros (Modal) */}
           {multiTenantEnabled && showMembersManagement && (
             <MembersManagement onClose={() => setShowMembersManagement(false)} />
+          )}
+
+          {/* Calendário Master (Modal) */}
+          {showCalendar && (
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-0 md:p-4 z-[100]">
+              <div className="bg-white w-full h-full md:max-w-[95vw] md:h-[90vh] md:rounded-xl shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in duration-200">
+                <div className="flex justify-between items-center px-6 py-4 border-b bg-gray-50/80">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-2xl">📅</span>
+                    <h2 className="text-xl font-black text-gray-900 tracking-tight">CALENDÁRIO MASTER</h2>
+                  </div>
+                  <button
+                    onClick={() => setShowCalendar(false)}
+                    className="p-2 hover:bg-gray-200 rounded-full transition-colors text-gray-500 hover:text-red-600"
+                  >
+                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+                <div className="flex-1 overflow-hidden">
+                  <MasterCalendar />
+                </div>
+              </div>
+            </div>
           )}
 
           {/* Professional Ad Modal */}
