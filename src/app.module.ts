@@ -9,6 +9,7 @@ import { PropertiesModule } from './properties/properties.module';
 import { BookingsModule } from './bookings/bookings.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { OrganizationsModule } from './organizations/organizations.module';
+import { ImportModule } from './import/import.module';
 import { ConfigController } from './config/config.controller';
 import { UnsplashController } from './unsplash/unsplash.controller';
 import { UnsplashService } from './unsplash/unsplash.service';
@@ -24,7 +25,8 @@ import { isMultiTenantEnabled, isOrganizationContextEnabled } from './config/fea
     AuthModule, 
     HealthModule, 
     PropertiesModule, 
-    BookingsModule
+    BookingsModule,
+    ImportModule
   ],
   controllers: [AppController, ConfigController, UnsplashController],
   providers: [AppService, UnsplashService],

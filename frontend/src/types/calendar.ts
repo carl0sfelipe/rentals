@@ -6,6 +6,9 @@ export interface CalendarEvent {
   endDate: string;
   title: string;
   status?: string;
+  observations?: string;
+  guestCount?: number;
+  guestsDetail?: any[];
 }
 export interface PropertyWithEvents {
   id: string;
