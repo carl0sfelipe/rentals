@@ -11,7 +11,7 @@ services:
   api-dev:
     container_name: rentals_api_dev
     build:
-      context: .
+      context: ../
       dockerfile: Dockerfile
       target: production
     ports:
@@ -39,7 +39,7 @@ services:
   api-test:
     container_name: rentals_api_test
     build:
-      context: .
+      context: ../
       dockerfile: Dockerfile
       target: production
     ports:
@@ -67,7 +67,7 @@ services:
   api-prod:
     container_name: rentals_api_prod
     build:
-      context: .
+      context: ../
       dockerfile: Dockerfile
       target: production
     ports:
@@ -166,9 +166,9 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ../nginx.conf:/etc/nginx/nginx.conf:ro
       - /etc/letsencrypt:/etc/letsencrypt:ro
-      - ./ssl:/etc/nginx/ssl:ro
+      - ../ssl:/etc/nginx/ssl:ro
     depends_on:
       - api-dev
       - api-test
