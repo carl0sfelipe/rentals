@@ -39,7 +39,8 @@ export class CalendarService {
           status: 'Confirmed',
           observations: String(b.observations || ''),
           guestCount: Number(b.guestCount || 0),
-          guestsDetail: b.guestsDetail || []
+          guestsDetail: b.guestsDetail || [],
+          propertyId: b.propertyId
         };
       });
 

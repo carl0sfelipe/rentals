@@ -1,6 +1,7 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import ProfessionalAd from './src/components/ProfessionalAd';
 import { MasterCalendar } from './src/components/calendar/MasterCalendar';
+import { ImportWizard } from './src/components/ImportWizard';
 
 // ============================================================================
 // FEATURE FLAGS (CONFIGURAÇÃO ÚNICA)
@@ -799,7 +800,7 @@ const PropertyForm = ({ property, onSave, onCancel, loading }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[110]">
       <div className="bg-white rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
         <div className="p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">
@@ -1819,6 +1820,7 @@ const DashboardPage = ({ user, activeOrganizationId, onLogout }) => {
   const [formLoading, setFormLoading] = useState(false);
   const [showMembersManagement, setShowMembersManagement] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
+  const [showImportWizard, setShowImportWizard] = useState(false);
   const [showProfessionalAd, setShowProfessionalAd] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [multiTenantEnabled, setMultiTenantEnabled] = useState(false);
@@ -1975,6 +1977,12 @@ const DashboardPage = ({ user, activeOrganizationId, onLogout }) => {
               >
                 📅 Calendário
               </button>
+              <button
+                onClick={() => setShowImportWizard(true)}
+                className="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-md transition-colors"
+              >
+                📥 Importar
+              </button>
               {multiTenantEnabled && (
                 <button
                   onClick={() => setShowMembersManagement(true)}
@@ -2079,7 +2087,11 @@ const DashboardPage = ({ user, activeOrganizationId, onLogout }) => {
                   </button>
                 </div>
                 <div className="flex-1 overflow-hidden">
-                  <MasterCalendar />
+                  <MasterCalendar 
+                    properties={properties}
+                    onEditProperty={handleEditProperty}
+                    onClose={() => setShowCalendar(false)}
+                  />
                 </div>
               </div>
             </div>
@@ -2094,6 +2106,18 @@ const DashboardPage = ({ user, activeOrganizationId, onLogout }) => {
                 setSelectedProperty(null);
               }}
               isPreview={true}
+            />
+          )}
+
+          {/* Import Wizard (Modal) */}
+          {showImportWizard && (
+            <ImportWizard
+              existingProperties={properties}
+              onClose={() => setShowImportWizard(false)}
+              onSave={() => {
+                setShowImportWizard(false);
+                window.location.reload(); // Simples reload para atualizar tudo
+              }}
             />
           )}
         </div>
